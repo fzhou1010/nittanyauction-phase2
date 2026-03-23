@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 text-center">
+        <h2>Welcome, Seller!</h2>
+        <p>You are logged in as <strong>{{ session['email'] }}</strong></p>
+        <div class="mt-4">
+            <a href="{{ url_for('seller.dashboard') }}" class="btn btn-primary me-2">Seller Dashboard</a>
+            <a href="{{ url_for('seller.list_product') }}" class="btn btn-outline-primary me-2">List a Product</a>
+            <a href="{{ url_for('listings.browse') }}" class="btn btn-outline-secondary">Browse Listings</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

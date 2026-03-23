@@ -8,6 +8,10 @@ def require_login():
     if 'email' not in session:
         return redirect(url_for('auth.login'))
 
+@bidder_bp.route('/welcome')
+def welcome():
+    return render_template('bidder/welcome.html')
+
 @bidder_bp.route('/credit_cards')
 def credit_cards():
     # TODO: list/add/remove credit cards

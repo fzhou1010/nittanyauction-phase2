@@ -1,3 +1,4 @@
+import hashlib
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from db import get_db, query_db
 
@@ -18,12 +19,20 @@ def login():
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
+        hashed = hashlib.sha256(password.encode('utf-8')).hexdigest()
         user = query_db('SELECT * FROM Users WHERE email = ? AND password = ?',
-                        [email, password], one=True)
+                        [email, hashed], one=True)
         if user:
             session['email'] = email
-            session['roles'] = get_user_roles(email)
-            return redirect(url_for('listings.browse'))
+            roles = get_user_roles(email)
+            session['roles'] = roles
+            # Redirect to role-specific welcome page
+            if 'helpdesk' in roles:
+                return redirect(url_for('helpdesk.welcome'))
+            elif 'seller' in roles:
+                return redirect(url_for('seller.welcome'))
+            else:
+                return redirect(url_for('bidder.welcome'))
         flash('Invalid email or password.')
     return render_template('auth/login.html')
 

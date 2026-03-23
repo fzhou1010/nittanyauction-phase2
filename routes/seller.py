@@ -11,6 +11,10 @@ def require_seller():
         flash('Seller access required.')
         return redirect(url_for('listings.browse'))
 
+@seller_bp.route('/welcome')
+def welcome():
+    return render_template('seller/welcome.html')
+
 @seller_bp.route('/dashboard')
 def dashboard():
     # TODO: seller listings, balance, ratings summary

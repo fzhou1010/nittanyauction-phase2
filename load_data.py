@@ -2,6 +2,7 @@ import csv
 import sqlite3
 import os
 import sys
+import hashlib
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'nittanyauction.db')
 SCHEMA_PATH = os.path.join(os.path.dirname(__file__), 'schema.sql')
@@ -35,6 +36,10 @@ def clean_value(val):
         val = val.replace('$', '').replace(',', '').strip()
     return val
 
+def hash_password(password):
+    """Hash a password using SHA256."""
+    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+
 def load_csv(db, filename, table, columns):
     filepath = os.path.join(DATA_DIR, filename)
     if not os.path.exists(filepath):
@@ -57,7 +62,11 @@ def load_csv(db, filename, table, columns):
                         if k.strip().lower() == col.strip().lower():
                             raw = row[k]
                             break
-                values.append(clean_value(raw))
+                val = clean_value(raw)
+                # Hash passwords for the Users table
+                if table == 'Users' and col == 'password' and val is not None:
+                    val = hash_password(val)
+                values.append(val)
             try:
                 db.execute(sql, values)
                 count += 1

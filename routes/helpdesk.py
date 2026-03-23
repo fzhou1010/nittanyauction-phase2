@@ -11,6 +11,10 @@ def require_helpdesk():
         flash('HelpDesk access required.')
         return redirect(url_for('listings.browse'))
 
+@helpdesk_bp.route('/welcome')
+def welcome():
+    return render_template('helpdesk/welcome.html')
+
 @helpdesk_bp.route('/queue')
 def queue():
     # TODO: pending/completed requests
