@@ -1,3 +1,8 @@
+# Populates the database from the CSV dataset
+# Run this script once (python load_data.py) to create nittanyauction.db with all tables filled
+# It deletes any existing DB and rebuilds from scratch using schema.sql + the CSV files
+# Passwords are hashed with SHA256 before being stored (never stored as plaintext)
+
 import csv
 import sqlite3
 import os
@@ -7,8 +12,11 @@ import hashlib
 DB_PATH = os.path.join(os.path.dirname(__file__), 'nittanyauction.db')
 SCHEMA_PATH = os.path.join(os.path.dirname(__file__), 'schema.sql')
 
+# Path to the folder containing all the CSV files
 DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'NittanyAuctionDataset_v1')
 
+# Each entry: (csv_filename, table_name, [column_names])
+# Tables with foreign keys are loaded after the tables they reference
 LOAD_ORDER = [
     ('Users.csv', 'Users', ['email', 'password']),
     ('Helpdesk.csv', 'Helpdesk', ['email', 'Position']),
@@ -27,6 +35,8 @@ LOAD_ORDER = [
 ]
 
 def clean_value(val):
+    # Sanitize a single CSV field: strip whitespace
+    # Convert blanks to None, and remove dollar signs/commas from monetary values
     if val is None:
         return None
     val = val.strip()
@@ -37,17 +47,19 @@ def clean_value(val):
     return val
 
 def hash_password(password):
-    """Hash a password using SHA256."""
+    # Hash a password using SHA256
     return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
 def load_csv(db, filename, table, columns):
+    # Read a CSV file and insert each row into the given table
+    # Return the number of rows successfully inserted
     filepath = os.path.join(DATA_DIR, filename)
     if not os.path.exists(filepath):
         print(f'  SKIP {filename} (not found)')
         return 0
 
-    placeholders = ', '.join(['?'] * len(columns))
-    col_names = ', '.join(columns)
+    placeholders = ', '.join(['?'] * len(columns))   # e.g. "?, ?, ?"
+    col_names = ', '.join(columns)                   # e.g. "email, password"
     sql = f'INSERT OR IGNORE INTO {table} ({col_names}) VALUES ({placeholders})'
 
     count = 0
@@ -76,22 +88,25 @@ def load_csv(db, filename, table, columns):
     return count
 
 def main():
+    # Start fresh -> delete old DB so we don't get duplicate/stale data
     if os.path.exists(DB_PATH):
         os.remove(DB_PATH)
         print('Removed existing database.')
 
     db = sqlite3.connect(DB_PATH)
-    db.execute('PRAGMA foreign_keys = OFF')
+    db.execute('PRAGMA foreign_keys = OFF')  # Temporarily off so we can load in any order
 
+    # Create all tables defined in schema.sql
     with open(SCHEMA_PATH) as f:
         db.executescript(f.read())
     print('Schema created.')
 
+    # Load each CSV into its corresponding table
     for filename, table, columns in LOAD_ORDER:
         count = load_csv(db, filename, table, columns)
         print(f'  {table}: {count} rows loaded from {filename}')
 
-    db.execute('PRAGMA foreign_keys = ON')
+    db.execute('PRAGMA foreign_keys = ON')  # Reenable FK enforcement for normal use
     db.close()
     print('Done. Database at:', DB_PATH)
 
