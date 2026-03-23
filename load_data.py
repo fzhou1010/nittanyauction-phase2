@@ -13,7 +13,7 @@ DB_PATH = os.path.join(os.path.dirname(__file__), 'nittanyauction.db')
 SCHEMA_PATH = os.path.join(os.path.dirname(__file__), 'schema.sql')
 
 # Path to the folder containing all the CSV files
-DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'NittanyAuctionDataset_v1')
+DATA_DIR = os.path.join(os.path.dirname(__file__), 'NittanyAuctionDataset_v1')
 
 # Each entry: (csv_filename, table_name, [column_names])
 # Tables with foreign keys are loaded after the tables they reference
