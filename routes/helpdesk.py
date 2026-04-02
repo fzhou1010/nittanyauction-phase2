@@ -100,8 +100,59 @@ def handle_request(rid):
 
 @helpdesk_bp.route('/categories', methods=['GET', 'POST'])
 def categories():
-    # Step 2: will implement category tree + add
-    return render_template('helpdesk/categories.html')
+    db = get_db()
+
+    if request.method == 'POST':
+        name = request.form.get('category_name', '').strip()
+        parent = request.form.get('parent_category', '').strip() or None
+
+        if not name:
+            flash('Category name is required.')
+            return redirect(url_for('helpdesk.categories'))
+
+        existing = query_db(
+            'SELECT 1 FROM Categories WHERE category_name = ?', [name], one=True
+        )
+        if existing:
+            flash(f'Category "{name}" already exists.')
+            return redirect(url_for('helpdesk.categories'))
+
+        if parent:
+            parent_exists = query_db(
+                'SELECT 1 FROM Categories WHERE category_name = ?', [parent], one=True
+            )
+            if not parent_exists:
+                flash(f'Parent category "{parent}" does not exist.')
+                return redirect(url_for('helpdesk.categories'))
+
+        db.execute(
+            'INSERT INTO Categories (category_name, parent_category) VALUES (?, ?)',
+            [name, parent],
+        )
+        db.commit()
+        flash(f'Category "{name}" created.')
+        return redirect(url_for('helpdesk.categories'))
+
+    tree = _build_category_tree()
+    all_categories = query_db(
+        'SELECT category_name FROM Categories ORDER BY category_name'
+    )
+    return render_template(
+        'helpdesk/categories.html',
+        tree=tree,
+        all_categories=all_categories,
+    )
+
+
+def _build_category_tree():
+    rows = query_db(
+        'SELECT category_name, parent_category FROM Categories ORDER BY category_name'
+    )
+    children = {}
+    for row in rows:
+        parent = row['parent_category']
+        children.setdefault(parent, []).append(row['category_name'])
+    return children
 
 
 @helpdesk_bp.route('/analytics')
