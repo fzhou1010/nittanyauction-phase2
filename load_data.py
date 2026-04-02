@@ -7,19 +7,20 @@ import csv
 import sqlite3
 import os
 import sys
-import hashlib
+import hashlib # my team and I will be using hashlib to implement SHA256 for the passwords saved in the database
 
+# Path to the database file and Schema
 DB_PATH = os.path.join(os.path.dirname(__file__), 'nittanyauction.db')
 SCHEMA_PATH = os.path.join(os.path.dirname(__file__), 'schema.sql')
 
 # Path to the folder containing all the CSV files
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'NittanyAuctionDataset_v1')
 
-# Each entry: (csv_filename, table_name, [column_names])
+# Each entry: (csv_filename, table_name, [column_names/attribute names])
 # Tables with foreign keys are loaded after the tables they reference
 LOAD_ORDER = [
     ('Users.csv', 'Users', ['email', 'password']),
-    ('Helpdesk.csv', 'Helpdesk', ['email', 'Position']),
+    ('Helpdesk.csv', 'Helpdesk', ['email', 'position']),
     ('Zipcode_Info.csv', 'Zipcode_Info', ['zipcode', 'city', 'state']),
     ('Address.csv', 'Address', ['address_id', 'zipcode', 'street_num', 'street_name']),
     ('Bidders.csv', 'Bidders', ['email', 'first_name', 'last_name', 'age', 'home_address_id', 'major']),
@@ -36,7 +37,7 @@ LOAD_ORDER = [
 
 def clean_value(val):
     # Sanitize a single CSV field: strip whitespace
-    # Convert blanks to None, and remove dollar signs/commas from monetary values
+    # Convert blanks to None, and remove dollar signs/commas from monetary values, so they can be omitted and default values will apply
     if val is None:
         return None
     val = val.strip()
@@ -54,18 +55,18 @@ def load_csv(db, filename, table, columns):
     # Read a CSV file and insert each row into the given table
     # Return the number of rows successfully inserted
     filepath = os.path.join(DATA_DIR, filename)
-    if not os.path.exists(filepath):
+    if not os.path.exists(filepath): # file not found
         print(f'  SKIP {filename} (not found)')
         return 0
 
-    placeholders = ', '.join(['?'] * len(columns))   # e.g. "?, ?, ?"
-    col_names = ', '.join(columns)                   # e.g. "email, password"
-    sql = f'INSERT OR IGNORE INTO {table} ({col_names}) VALUES ({placeholders})'
+    # we dont want to have all of the columns in case of a column that is empty. instead use DEFAULT values
 
     count = 0
     with open(filepath, 'r', encoding='utf-8-sig') as f:
         reader = csv.DictReader(f)
         for row in reader:
+            # get the columns that have values
+            rcols = []
             values = []
             for col in columns:
                 raw = row.get(col)
@@ -78,11 +79,27 @@ def load_csv(db, filename, table, columns):
                 # Hash passwords for the Users table
                 if table == 'Users' and col == 'password' and val is not None:
                     val = hash_password(val)
+
+                # we want to check whether the value is none so we can omit the column and we can apply the default value from schema
+                if val is None:
+                    continue
+                #otherwise, append the column since there is a value
+                rcols.append(col)
                 values.append(val)
+            # skip csv lines if all empty
+            if not rcols:
+                continue
+            
+            
+            placeholders = ', '.join(['?'] * len(rcols))   # e.g. "?, ?, ?"
+            col_names = ', '.join(rcols)                   # e.g. "email, password"
+            sql = f'INSERT OR IGNORE INTO {table} ({col_names}) VALUES ({placeholders})'
+
             try:
                 db.execute(sql, values)
-                count += 1
+                count += 1 #increase the count of the rows processed
             except sqlite3.IntegrityError as e:
+                print(e) #print the integrity error
                 pass
     db.commit()
     return count
@@ -104,7 +121,7 @@ def main():
     # Load each CSV into its corresponding table
     for filename, table, columns in LOAD_ORDER:
         count = load_csv(db, filename, table, columns)
-        print(f'  {table}: {count} rows loaded from {filename}')
+        print(f'  {table}: {count} rows sucessfully loaded from {filename}')
 
     db.execute('PRAGMA foreign_keys = ON')  # Reenable FK enforcement for normal use
     db.close()

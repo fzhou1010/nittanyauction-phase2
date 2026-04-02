@@ -1,4 +1,4 @@
-PRAGMA foreign_keys = ON;
+-- we don't need pragma foreign keys 
 
 CREATE TABLE IF NOT EXISTS Users ( -- all create should check whether table exists
     email TEXT PRIMARY KEY,
