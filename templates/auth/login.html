@@ -15,5 +15,10 @@
             <button class="btn btn-primary w-100">Login</button>
         </form>
     </div>
+    <div className="footer p-6">
+            <p class="text-center mt-3">
+                Don't have an account? <a href="{{ url_for('auth.register') }}">Register here</a>
+            </p>
+        </div>
 </div>
 {% endblock %}

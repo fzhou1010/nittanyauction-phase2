@@ -1,5 +1,108 @@
 {% extends "base.html" %}
+{% block title %}Nittany Auction - Register{% endblock %}
 {% block content %}
-<h3>auth / register</h3>
-<p class="text-muted">TODO</p>
+<div class="row justify-content-center">
+    <div class="col-md-6 mt-4">
+        <div className="header">
+            <img src="{{ url_for('static', filename='lsu_logo.png') }}" alt="Logo" class="w-25 p-0" style="max-width: 200px;">
+            <h3><strong>Register to get started with Nittany Auction!</strong></h3>
+            <p>Create a buyer/seller account to begin browsing on Nittany Auction</p>
+        </div>
+        
+        <form method="POST">
+            <!-- Login Credentials -->
+            <h5 class="mt-4">Login Credentials</h5>
+            <div className="email-field" class="mt-4 mb-3">
+                <label class="form-label">Email</label>
+                <input type="email" name="email" class="form-control" required>
+            </div>
+            <div className="password-field" class="mb-3">
+                <label class="form-label">Password</label>
+                <input type="password" id="password" name="password" class="form-control" required>
+            </div>
+            <div  className="cpassword-field" class="mb-3">
+                <label class="form-label">Confirm Password</label>
+                <input type="password" id="confirm_password" name="confirm_password" class="form-control" required>
+            </div>
+            <small id="password-mismatch" class="text-danger"></small>
+
+            <!-- Personal Information Section-->
+            <h5 class="mt-4">Personal Information</h5>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">First Name</label>
+                    <input type="text" name="first_name" class="form-control" required>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Last Name</label>
+                    <input type="text" name="last_name" class="form-control" required>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Age</label>
+                    <input type="number" name="age" class="form-control" min="1" max="120">
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Major</label>
+                    <input type="text" name="major" class="form-control">
+                </div>
+            </div>
+            <!-- Home Address Section -->
+            <h5 class="mt-4">Home Address</h5>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Street Number</label>
+                    <input type="text" name="street_num" class="form-control">
+                </div>
+                <div class="col-md-8 mb-3">
+                    <label class="form-label">Street Name</label>
+                    <input type="text" name="street_name" class="form-control">
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Zipcode</label>
+                    <input type="text" name="zipcode" class="form-control">
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">City</label>
+                    <input type="text" name="city" class="form-control">
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">State</label>
+                    <input type="text" name="state" class="form-control">
+                </div>
+            </div>
+
+            <button class="btn btn-primary w-100 mt-3">Register</button>
+        </form>
+        <div className="footer p-6">
+            <p class="text-center mt-3">
+                Already have an account? <a href="{{ url_for('auth.login') }}">Login here</a>
+            </p>
+        </div>
+       
+    </div>
+</div>
+<script>
+    // want to set up an event listener so that it notifies the user whenever the passwords don't match
+    const pswd = document.getElementById("password");
+    const cpswd = document.getElementById("confirm_password");
+    const err = document.getElementById('password-mismatch'); // this is to edit the message that pops up
+    
+    const pswd_check = () => {
+        if(cpswd.value == ''){ //if the confirm password has not been typed yet, it means that the user has not edited
+            err.textContent = ''; //set errror message to nothing
+        }
+        else if(pswd.value !== cpswd.value){
+            err.textContent = "Passwords don't match, please try again."
+        }
+        else{ //means that the passwords are matching
+            err.textContent = '';
+        }
+    }
+    cpswd.addEventListener('input', pswd_check);
+    pswd.addEventListener('input', pswd_check);
+</script>
 {% endblock %}
