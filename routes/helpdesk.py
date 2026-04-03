@@ -279,5 +279,90 @@ def _build_category_tree():
 
 @helpdesk_bp.route('/analytics')
 def analytics():
-    # Step 4: will implement marketing analysis
-    return render_template('helpdesk/analytics.html')
+    auctions_by_major = query_db(
+        'SELECT b.major, COUNT(*) AS cnt '
+        'FROM Auction_Listings al '
+        'JOIN Bidders b ON b.email = al.Seller_Email '
+        'GROUP BY b.major '
+        'ORDER BY cnt DESC'
+    )
+
+    top_categories = query_db(
+        'SELECT Category, COUNT(*) AS cnt '
+        'FROM Auction_Listings '
+        'GROUP BY Category '
+        'ORDER BY cnt DESC '
+        'LIMIT 10'
+    )
+
+    revenue_by_category = query_db(
+        'SELECT al.Category, '
+        '       COUNT(t.Transaction_ID) AS sales, '
+        '       COALESCE(SUM(t.Payment), 0) AS revenue '
+        'FROM Transactions t '
+        'JOIN Auction_Listings al ON al.Seller_Email = t.Seller_Email '
+        '     AND al.Listing_ID = t.Listing_ID '
+        'GROUP BY al.Category '
+        'ORDER BY revenue DESC '
+        'LIMIT 10'
+    )
+
+    auction_outcomes = query_db(
+        'SELECT Status, COUNT(*) AS cnt '
+        'FROM Auction_Listings '
+        'GROUP BY Status '
+        'ORDER BY Status'
+    )
+
+    top_sellers = query_db(
+        'SELECT t.Seller_Email, '
+        '       COUNT(t.Transaction_ID) AS sales, '
+        '       SUM(t.Payment) AS revenue '
+        'FROM Transactions t '
+        'GROUP BY t.Seller_Email '
+        'ORDER BY revenue DESC '
+        'LIMIT 10'
+    )
+
+    bidder_age_distribution = query_db(
+        'SELECT CASE '
+        '         WHEN age < 20 THEN "Under 20" '
+        '         WHEN age BETWEEN 20 AND 29 THEN "20-29" '
+        '         WHEN age BETWEEN 30 AND 39 THEN "30-39" '
+        '         WHEN age BETWEEN 40 AND 49 THEN "40-49" '
+        '         ELSE "50+" '
+        '       END AS age_group, '
+        '       COUNT(*) AS cnt '
+        'FROM Bidders '
+        'WHERE age IS NOT NULL '
+        'GROUP BY age_group '
+        'ORDER BY MIN(age)'
+    )
+
+    top_bidders = query_db(
+        'SELECT b.Bidder_Email, COUNT(*) AS bid_count '
+        'FROM Bids b '
+        'GROUP BY b.Bidder_Email '
+        'ORDER BY bid_count DESC '
+        'LIMIT 10'
+    )
+
+    sales_under_30 = query_db(
+        'SELECT COALESCE(SUM(t.Payment), 0) AS total '
+        'FROM Transactions t '
+        'JOIN Bidders b ON b.email = t.Buyer_Email '
+        'WHERE b.age < 30',
+        one=True,
+    )
+
+    return render_template(
+        'helpdesk/analytics.html',
+        auctions_by_major=auctions_by_major,
+        top_categories=top_categories,
+        revenue_by_category=revenue_by_category,
+        auction_outcomes=auction_outcomes,
+        top_sellers=top_sellers,
+        bidder_age_distribution=bidder_age_distribution,
+        top_bidders=top_bidders,
+        sales_under_30=sales_under_30,
+    )

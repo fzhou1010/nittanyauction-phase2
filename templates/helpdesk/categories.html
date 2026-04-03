@@ -1,8 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Category Management{% endblock %}
 {% block content %}
-<h2>Category Management</h2>
-<p class="text-muted">View and manage the product category hierarchy.</p>
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('helpdesk.welcome') }}">HelpDesk</a></li>
+        <li class="breadcrumb-item active">Categories</li>
+    </ol>
+</nav>
+<h2 class="text-center">Category Management</h2>
+<p class="text-muted text-center">View and manage the product category hierarchy.</p>
 
 <div class="row">
     <div class="col-md-7">

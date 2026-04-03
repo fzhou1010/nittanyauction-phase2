@@ -1,8 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Request Queue{% endblock %}
 {% block content %}
-<h2>Request Queue</h2>
-<p class="text-muted">Manage incoming and assigned requests.</p>
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('helpdesk.welcome') }}">HelpDesk</a></li>
+        <li class="breadcrumb-item active">Request Queue</li>
+    </ol>
+</nav>
+<h2 class="text-center">Request Queue</h2>
+<p class="text-muted text-center">Manage incoming and assigned requests.</p>
 
 <ul class="nav nav-tabs mb-3" role="tablist">
     <li class="nav-item">
