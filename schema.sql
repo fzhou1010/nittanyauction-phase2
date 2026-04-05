@@ -1,4 +1,4 @@
-PRAGMA foreign_keys = ON;
+-- we don't need pragma foreign keys 
 
 CREATE TABLE IF NOT EXISTS Users ( -- all create should check whether table exists
     email TEXT PRIMARY KEY,
@@ -70,13 +70,13 @@ CREATE TABLE IF NOT EXISTS Sellers (
 );
 
 CREATE TABLE IF NOT EXISTS Local_Vendors (
-    Email TEXT,
-    Business_Name TEXT NOT NULL,
-    Business_Address_ID TEXT,
-    Customer_Service_Phone_Number TEXT,
-    PRIMARY KEY (Email),
-    FOREIGN KEY (Email) REFERENCES Sellers(email),
-    FOREIGN KEY (Business_Address_ID) REFERENCES Address(address_id)
+    email TEXT,
+    business_name TEXT NOT NULL,
+    business_address_id TEXT,
+    customer_service_phone_number TEXT,
+    PRIMARY KEY (email),
+    FOREIGN KEY (email) REFERENCES Sellers(email),
+    FOREIGN KEY (business_address_id) REFERENCES Address(address_id)
 );
 
 CREATE TABLE IF NOT EXISTS Categories (
@@ -142,7 +142,7 @@ CREATE TABLE IF NOT EXISTS Rating (
 
 -- Team Phase 1 new feature: Product Q&A
 CREATE TABLE IF NOT EXISTS Questions (
-    question_id INTEGER AUTOINCREMENT,
+    question_id INTEGER,
     Seller_Email TEXT NOT NULL,
     Listing_ID INTEGER NOT NULL,
     Bidder_Email TEXT NOT NULL,
@@ -156,11 +156,12 @@ CREATE TABLE IF NOT EXISTS Questions (
 
 -- Team Phase 1 new feature: Watchlist (saved search alerts)
 CREATE TABLE IF NOT EXISTS Watchlist (
-    watchlist_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    watchlist_id INTEGER,
     Bidder_Email TEXT NOT NULL,
     category TEXT NOT NULL,
-    max_price REAL NOT NULL CHECK(max_price > 0),
-    condition TEXT CHECK(condition IN ('New', 'Lightly Used', 'Used') OR condition IS NULL),
+    max_price REAL NOT NULL CHECK(max_price > 0), --maximum price the user wants to keep track of the product until
+    condition TEXT CHECK(condition IN ('New', 'Lightly Used', 'Used') OR condition IS NULL), --condition of the
+    PRIMARY KEY (watchlist_id),product that you want it in
     UNIQUE(Bidder_Email, category, max_price, condition),
     FOREIGN KEY (Bidder_Email) REFERENCES Bidders(email) ON DELETE CASCADE,
     FOREIGN KEY (category) REFERENCES Categories(category_name)

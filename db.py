@@ -1,7 +1,7 @@
 # Database helper functions
 # Provides a shared SQLite connection per request and a convenience query function
 
-import sqlite3
+import sqlite3 as sql
 import os
 
 DATABASE = os.path.join(os.path.dirname(__file__), 'nittanyauction.db')
@@ -11,8 +11,8 @@ def get_db():
     Reuses the same connection within a single request (stored on Flask's g object)."""
     from flask import g
     if 'db' not in g:
-        g.db = sqlite3.connect(DATABASE)
-        g.db.row_factory = sqlite3.Row           # Lets us access columns by name (row['email'])
+        g.db = sql.connect(DATABASE)
+        g.db.row_factory = sql.Row           # Lets us access columns by name (row['email'])
         g.db.execute('PRAGMA foreign_keys = ON') # Enforce foreign key constraints
     return g.db
 
@@ -25,8 +25,8 @@ def close_db(e=None):
 
 def init_db():
     """Create all tables from schema.sql (used for initial setup)."""
-    db = sqlite3.connect(DATABASE)
-    db.row_factory = sqlite3.Row
+    db = sql.connect(DATABASE)
+    db.row_factory = sql.Row
     db.execute('PRAGMA foreign_keys = ON')
     with open(os.path.join(os.path.dirname(__file__), 'schema.sql')) as f:
         db.executescript(f.read())

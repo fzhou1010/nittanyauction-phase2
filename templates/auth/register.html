@@ -1,5 +1,58 @@
 {% extends "base.html" %}
+{% block title %}Nittany Auction - Register{% endblock %}
 {% block content %}
-<h3>auth / register</h3>
-<p class="text-muted">TODO</p>
+<div class="row justify-content-center">
+    <div class="col-md-8 mt-4">
+        <div class="header">
+            <img src="{{ url_for('static', filename='lsu_logo.png') }}" alt="Logo" class="w-25 p-0" style="max-width: 200px;">
+            <h3><strong>Register to get started with Nittany Auction!</strong></h3>
+            <p>Create a buyer/seller account to begin browsing on Nittany Auction</p>
+        </div>
+
+        <!-- We must also differentiate between the different types of users on the Platform -->
+        <!-- User Role Selection --> 
+        <div id="role-selection">
+            <h5 class="mt-4 mb-3">Please Select the Role You are Registering For: </h5>
+            <div class="row">
+                <div class="col-md-4 mb-3" id="student-bidder-card">
+                    <a href="{{url_for('auth.register_form', role='bidder')}}" class="text-decoration-none">
+                        <div class="card h-100 text-center p-3 role-card" style="cursor: pointer">
+                            <div class="card-body">
+                                <h3 class="card-title"> Bidder </h3>
+                                <p class="card-text text-muted">LSU Students who can browse and bid on auction listings</p>
+                            </div>
+                        </div>
+                    </a>                    
+                </div>
+                <div class="col-md-4 mb-3" id="student-seller-card">
+                    <a href="{{url_for('auth.register_form', role='student_seller')}}" class="text-decoration-none">
+                        <div class="card h-100 text-center p-3 role-card" style="cursor: pointer">
+                            <div class="card-body">
+                                <h3 class="card-title"> Student Seller </h3>
+                                <p class="card-text text-muted">Students who want to sell some of their things on the site.</p>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-4 mb-3" id="local-vendor-card">
+                    <a href="{{url_for('auth.register_form', role='local_vendor')}}" class="text-decoration-none">
+                        <div class="card h-100 text-center p-3 role-card" style="cursor: pointer">
+                            <div class="card-body">
+                                <h3 class="card-title"> Local Vendor </h3>
+                                <p class="card-text text-muted">Local Vendors that are authorized to place listings on the site</p>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer p-6">
+            <p class="text-center mt-3">
+                Already have an account? <a href="{{ url_for('auth.login') }}">Login here</a>
+            </p>
+        </div>
+       
+    </div>
+</div>
 {% endblock %}
