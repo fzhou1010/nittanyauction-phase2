@@ -107,12 +107,11 @@ CREATE TABLE IF NOT EXISTS Auction_Listings (
 );
 
 CREATE TABLE IF NOT EXISTS Bids (
-    Bid_ID INTEGER,
+    Bid_ID INTEGER PRIMARY KEY AUTOINCREMENT,
     Seller_Email TEXT NOT NULL,
     Listing_ID INTEGER NOT NULL,
     Bidder_Email TEXT NOT NULL,
     Bid_Price REAL NOT NULL,
-    PRIMARY KEY (Bid_ID),
     FOREIGN KEY (Seller_Email, Listing_ID) REFERENCES Auction_Listings(Seller_Email, Listing_ID),
     FOREIGN KEY (Bidder_Email) REFERENCES Bidders(email)
 );
@@ -142,14 +141,13 @@ CREATE TABLE IF NOT EXISTS Rating (
 
 -- Team Phase 1 new feature: Product Q&A
 CREATE TABLE IF NOT EXISTS Questions (
-    question_id INTEGER,
+    question_id INTEGER PRIMARY KEY AUTOINCREMENT,
     Seller_Email TEXT NOT NULL,
     Listing_ID INTEGER NOT NULL,
     Bidder_Email TEXT NOT NULL,
     question_text TEXT NOT NULL,
     answer_text TEXT,
     question_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (question_id),
     FOREIGN KEY (Seller_Email, Listing_ID) REFERENCES Auction_Listings(Seller_Email, Listing_ID),
     FOREIGN KEY (Bidder_Email) REFERENCES Bidders(email)
 );
