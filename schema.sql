@@ -70,13 +70,13 @@ CREATE TABLE IF NOT EXISTS Sellers (
 );
 
 CREATE TABLE IF NOT EXISTS Local_Vendors (
-    Email TEXT,
-    Business_Name TEXT NOT NULL,
-    Business_Address_ID TEXT,
-    Customer_Service_Phone_Number TEXT,
-    PRIMARY KEY (Email),
-    FOREIGN KEY (Email) REFERENCES Sellers(email),
-    FOREIGN KEY (Business_Address_ID) REFERENCES Address(address_id)
+    email TEXT,
+    business_name TEXT NOT NULL,
+    business_address_id TEXT,
+    customer_service_phone_number TEXT,
+    PRIMARY KEY (email),
+    FOREIGN KEY (email) REFERENCES Sellers(email),
+    FOREIGN KEY (business_address_id) REFERENCES Address(address_id)
 );
 
 CREATE TABLE IF NOT EXISTS Categories (
@@ -142,7 +142,7 @@ CREATE TABLE IF NOT EXISTS Rating (
 
 -- Team Phase 1 new feature: Product Q&A
 CREATE TABLE IF NOT EXISTS Questions (
-    question_id INTEGER AUTOINCREMENT,
+    question_id INTEGER,
     Seller_Email TEXT NOT NULL,
     Listing_ID INTEGER NOT NULL,
     Bidder_Email TEXT NOT NULL,
@@ -156,7 +156,7 @@ CREATE TABLE IF NOT EXISTS Questions (
 
 -- Team Phase 1 new feature: Watchlist
 CREATE TABLE IF NOT EXISTS Watchlist (
-    watchlist_id INTEGER AUTOINCREMENT,
+    watchlist_id INTEGER,
     Bidder_email TEXT NOT NULL,
     category TEXT,
     max_price REAL, --maximum price the user wants to keep track of the product until

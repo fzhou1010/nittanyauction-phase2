@@ -26,7 +26,7 @@ LOAD_ORDER = [
     ('Bidders.csv', 'Bidders', ['email', 'first_name', 'last_name', 'age', 'home_address_id', 'major']),
     ('Credit_Cards.csv', 'Credit_Cards', ['credit_card_num', 'card_type', 'expire_month', 'expire_year', 'security_code', 'Owner_email']),
     ('Sellers.csv', 'Sellers', ['email', 'bank_routing_number', 'bank_account_number', 'balance']),
-    ('Local_Vendors.csv', 'Local_Vendors', ['Email', 'Business_Name', 'Business_Address_ID', 'Customer_Service_Phone_Number']),
+    ('Local_Vendors.csv', 'Local_Vendors', ['email', 'business_name', 'business_address_id', 'customer_service_phone_number']),
     ('Categories.csv', 'Categories', ['parent_category', 'category_name']),
     ('Auction_Listings.csv', 'Auction_Listings', ['Seller_Email', 'Listing_ID', 'Category', 'Auction_Title', 'Product_Name', 'Product_Description', 'Quantity', 'Reserve_Price', 'Max_bids', 'Status']),
     ('Bids.csv', 'Bids', ['Bid_ID', 'Seller_Email', 'Listing_ID', 'Bidder_Email', 'Bid_Price']),
