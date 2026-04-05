@@ -7,15 +7,26 @@ listings_bp = Blueprint('listings', __name__)
 def browse():
     if 'email' not in session:
         return redirect(url_for('auth.login'))
-    # TODO: category browsing, listing display
-    return render_template('listings/browse.html')
 
-@listings_bp.route('/search')
-def search():
-    if 'email' not in session:
-        return redirect(url_for('auth.login'))
-    # TODO: keyword/category/price search
-    return render_template('listings/search.html')
+    search = request.args.get("q")
+    category_search = request.args.get('category', '')
+
+    categories = query_db('SELECT DISTINCT Category FROM Auction_Listings')
+
+    query = ('SELECT * FROM Auction_Listings WHERE 1=1')
+    args = []
+
+    if search:
+        query += (' AND (Auction_Title LIKE ? OR Product_Name LIKE ?)')
+        args.extend([f'%{search}%', f'%{search}%'])
+
+    if category_search:
+        query += (' AND Category = ?')
+        args.append(category_search)
+
+    listings = query_db(query, tuple(args))
+
+    return render_template('listings/browse.html', listings=listings, categories=categories)
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>')
 def detail(seller_email, listing_id):
