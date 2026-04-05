@@ -1,9 +1,30 @@
 {% extends "base.html" %}
+{% block title %}HelpDesk{% endblock %}
 {% block content %}
 <div class="row justify-content-center mt-5">
     <div class="col-md-6 text-center">
-        <h2>Welcome, HelpDesk Staff!</h2>
-        <p>You are logged in as <strong>{{ session['email'] }}</strong></p>
+        <h2>HelpDesk Dashboard</h2>
+        <p>Logged in as <strong>{{ session['email'] }}</strong></p>
+
+        <div class="row mt-4 g-3">
+            <div class="col-6">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3>{{ unassigned }}</h3>
+                        <p class="text-muted mb-0">Unassigned</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3>{{ my_pending }}</h3>
+                        <p class="text-muted mb-0">My Pending</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="mt-4">
             <a href="{{ url_for('helpdesk.queue') }}" class="btn btn-primary me-2">Request Queue</a>
             <a href="{{ url_for('helpdesk.categories') }}" class="btn btn-outline-primary me-2">Categories</a>

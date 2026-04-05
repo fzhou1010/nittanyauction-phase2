@@ -1,5 +1,172 @@
 {% extends "base.html" %}
+{% block title %}Marketing Analytics{% endblock %}
 {% block content %}
-<h3>helpdesk / analytics</h3>
-<p class="text-muted">TODO</p>
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('helpdesk.welcome') }}">HelpDesk</a></li>
+        <li class="breadcrumb-item active">Analytics</li>
+    </ol>
+</nav>
+<h2 class="text-center">Marketing Analytics</h2>
+<p class="text-muted text-center">Platform data for market research and analysis.</p>
+
+<div class="row g-4 pb-5">
+
+    {# Auction Outcomes #}
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">Auction Outcomes</div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Status</th><th class="text-end">Count</th></tr></thead>
+                    <tbody>
+                        {% for row in auction_outcomes %}
+                        <tr>
+                            <td>
+                                {% if row['Status'] == 1 %}
+                                <span class="badge bg-success">Active</span>
+                                {% elif row['Status'] == 2 %}
+                                <span class="badge bg-primary">Sold</span>
+                                {% elif row['Status'] == 0 %}
+                                <span class="badge bg-secondary">Inactive</span>
+                                {% else %}
+                                <span class="badge bg-dark">{{ row['Status'] }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">{{ row['cnt'] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# Sales by Bidders Under 30 #}
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">Bidder Age Distribution</div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <thead><tr><th>Age Group</th><th class="text-end">Bidders</th></tr></thead>
+                    <tbody>
+                        {% for row in bidder_age_distribution %}
+                        <tr>
+                            <td>{{ row['age_group'] }}</td>
+                            <td class="text-end">{{ row['cnt'] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <div class="alert alert-light mb-0 py-2">
+                    Total purchases by bidders under 30:
+                    <strong>${{ "{:,.0f}".format(sales_under_30['total']) }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Top Categories by Listings #}
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">Top 10 Categories by Listings</div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Category</th><th class="text-end">Listings</th></tr></thead>
+                    <tbody>
+                        {% for row in top_categories %}
+                        <tr>
+                            <td>{{ row['Category'] }}</td>
+                            <td class="text-end">{{ row['cnt'] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# Revenue by Category #}
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">Top 10 Categories by Revenue</div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Category</th><th class="text-end">Sales</th><th class="text-end">Revenue</th></tr></thead>
+                    <tbody>
+                        {% for row in revenue_by_category %}
+                        <tr>
+                            <td>{{ row['Category'] }}</td>
+                            <td class="text-end">{{ row['sales'] }}</td>
+                            <td class="text-end">${{ "{:,.0f}".format(row['revenue']) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# Auctions by Seller Major #}
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">Auctions by Seller Major</div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Major</th><th class="text-end">Auctions</th></tr></thead>
+                    <tbody>
+                        {% for row in auctions_by_major %}
+                        <tr>
+                            <td>{{ row['major'] or 'N/A' }}</td>
+                            <td class="text-end">{{ row['cnt'] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# Top Sellers by Revenue #}
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">Top 10 Sellers by Revenue</div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Seller</th><th class="text-end">Sales</th><th class="text-end">Revenue</th></tr></thead>
+                    <tbody>
+                        {% for row in top_sellers %}
+                        <tr>
+                            <td>{{ row['Seller_Email'] }}</td>
+                            <td class="text-end">{{ row['sales'] }}</td>
+                            <td class="text-end">${{ "{:,.0f}".format(row['revenue']) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# Most Active Bidders #}
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">Top 10 Most Active Bidders</div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Bidder</th><th class="text-end">Bids Placed</th></tr></thead>
+                    <tbody>
+                        {% for row in top_bidders %}
+                        <tr>
+                            <td>{{ row['Bidder_Email'] }}</td>
+                            <td class="text-end">{{ row['bid_count'] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
 {% endblock %}

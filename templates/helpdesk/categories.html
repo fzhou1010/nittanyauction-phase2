@@ -1,5 +1,76 @@
 {% extends "base.html" %}
+{% block title %}Category Management{% endblock %}
 {% block content %}
-<h3>helpdesk / categories</h3>
-<p class="text-muted">TODO</p>
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="{{ url_for('helpdesk.welcome') }}">HelpDesk</a></li>
+        <li class="breadcrumb-item active">Categories</li>
+    </ol>
+</nav>
+<h2 class="text-center">Category Management</h2>
+<p class="text-muted text-center">View and manage the product category hierarchy.</p>
+
+<div class="row">
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header">Category Hierarchy</div>
+            <div class="card-body">
+                {% macro render_tree(parent) %}
+                {% if tree.get(parent) %}
+                <ul class="list-unstyled ms-3">
+                    {% for name in tree[parent] %}
+                    <li class="mb-1">
+                        {% if tree.get(name) %}
+                        <strong>{{ name }}</strong>
+                        {{ render_tree(name) }}
+                        {% else %}
+                        <span class="text-muted">&#8226;</span> {{ name }}
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                {% endmacro %}
+
+                {% if tree.get(None) %}
+                <ul class="list-unstyled">
+                    {% for root in tree[None] %}
+                    <li class="mb-2">
+                        <strong>{{ root }}</strong>
+                        {{ render_tree(root) }}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted">No categories found.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header">Add Category</div>
+            <div class="card-body">
+                <form method="post">
+                    <div class="mb-3">
+                        <label class="form-label" for="category_name">Category Name</label>
+                        <input type="text" class="form-control" id="category_name"
+                               name="category_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="parent_category">Parent Category</label>
+                        <select class="form-select" id="parent_category" name="parent_category">
+                            <option value="">None (root category)</option>
+                            {% for cat in all_categories %}
+                            <option value="{{ cat['category_name'] }}">{{ cat['category_name'] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Category</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
