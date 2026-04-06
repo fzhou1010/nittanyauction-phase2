@@ -3,6 +3,51 @@ from db import get_db, query_db
 
 listings_bp = Blueprint('listings', __name__)
 
+
+def check_auction_complete(seller_email, listing_id):
+    """Evaluate whether an auction has reached Max_bids and resolve it.
+
+    Returns a dict describing the outcome, or None if the auction is still active.
+    Side-effect: updates Auction_Listings.Status (2=sold, 0=failed).
+    """
+    listing = query_db(
+        'SELECT * FROM Auction_Listings WHERE Seller_Email = ? AND Listing_ID = ?',
+        [seller_email, listing_id], one=True,
+    )
+    if not listing or listing['Status'] != 1:
+        return None
+
+    bid_count = query_db(
+        'SELECT COUNT(*) AS cnt FROM Bids WHERE Seller_Email = ? AND Listing_ID = ?',
+        [seller_email, listing_id], one=True,
+    )['cnt']
+
+    if bid_count < listing['Max_bids']:
+        return None
+
+    highest = query_db(
+        'SELECT Bidder_Email, Bid_Price FROM Bids '
+        'WHERE Seller_Email = ? AND Listing_ID = ? '
+        'ORDER BY Bid_Price DESC LIMIT 1',
+        [seller_email, listing_id], one=True,
+    )
+
+    db = get_db()
+    if highest['Bid_Price'] >= listing['Reserve_Price']:
+        db.execute(
+            'UPDATE Auction_Listings SET Status = 2 WHERE Seller_Email = ? AND Listing_ID = ?',
+            [seller_email, listing_id],
+        )
+        db.commit()
+        return {'status': 'sold', 'winner': highest['Bidder_Email'], 'amount': highest['Bid_Price']}
+
+    db.execute(
+        'UPDATE Auction_Listings SET Status = 0 WHERE Seller_Email = ? AND Listing_ID = ?',
+        [seller_email, listing_id],
+    )
+    db.commit()
+    return {'status': 'failed'}
+
 @listings_bp.route('/browse')
 def browse():
     if 'email' not in session:
@@ -21,7 +66,7 @@ def browse():
             SELECT al.Seller_Email, al.Listing_ID, al.Auction_Title, al.Product_Name, al.Category
             FROM Auction_Listings al
             JOIN cat_tree ct ON al.Category = ct.category_name
-            WHERE al.remaining_bids > 0
+            WHERE al.Status = 1
         ''', [category])
 
     current_cat = category
@@ -94,9 +139,26 @@ def detail(seller_email, listing_id):
 
     questions = []
 
+    # Determine auction-end state for the template
+    winner_email = None
+    has_paid = False
+    bid_count = len(bids)
+    remaining_bids = listing['Max_bids'] - bid_count if listing['Max_bids'] else 0
 
-    # TODO: Q&A
-    return render_template('listings/detail.html', listing=listing, bids=bids, category_path=category_path, questions=questions)
+    if listing['Status'] == 2 and bids:
+        winner_email = bids[0]['Bidder_Email']  # bids ordered DESC by price
+        txn = query_db(
+            'SELECT 1 FROM Transactions WHERE Seller_Email = ? AND Listing_ID = ?',
+            [seller_email, listing_id], one=True,
+        )
+        has_paid = txn is not None
+
+    return render_template(
+        'listings/detail.html',
+        listing=listing, bids=bids, category_path=category_path,
+        questions=questions, winner_email=winner_email, has_paid=has_paid,
+        remaining_bids=remaining_bids,
+    )
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>/bid', methods=['POST'])
 def place_bid(seller_email, listing_id):
