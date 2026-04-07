@@ -5,40 +5,6 @@ listings_bp = Blueprint('listings', __name__)
 
 @listings_bp.route('/browse')
 def browse():
-    if 'email' not in session:
-        return redirect(url_for('auth.login'))
-    
-    category = request.args.get('category')
-    listings = []
-    if category:
-        listings = query_db('''
-            WITH RECURSIVE cat_tree AS (
-                SELECT category_name FROM Categories WHERE category_name = ?
-                UNION ALL
-                SELECT c.category_name FROM Categories c
-                    JOIN cat_tree ct ON c.parent_category = ct.category_name
-            )
-            SELECT al.Seller_Email, al.Listing_ID, al.Auction_Title, al.Product_Name, al.Category
-            FROM Auction_Listings al
-            JOIN cat_tree ct ON al.Category = ct.category_name
-            WHERE al.remaining_bids > 0
-        ''', [category])
-
-    current_cat = category
-    category_path = []
-    while current_cat:
-        category_path.insert(0, current_cat)
-        parent = query_db(
-            'SELECT parent_category FROM Categories WHERE category_name = ?',
-            [current_cat],
-            one=True
-        )
-        current_cat = parent['parent_category'] if parent else None
-
-    categories = query_db('SELECT category_name FROM Categories ORDER BY category_name')
-    
-    return render_template('listings/browse.html', listings=listings, categories=categories, selected_category=category, category_path=category_path)
-
     search = request.args.get("q")
     category_search = request.args.get('category', '')
 

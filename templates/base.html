@@ -13,7 +13,7 @@
         <a class="navbar-brand" href="/">NittanyAuction</a>
         {% if session.get('email') %}
         <div class="navbar-nav ms-auto">
-            <span class="nav-link">{{ session['email'] }}</span>
+            <a class="nav-link" href="{{url_for('auth.profile')}}" class="text-decoration-none">{{ session['email'] }}</a>
             <a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a>
         </div>
         {% endif %}
@@ -30,4 +30,9 @@
     {% block content %}{% endblock %}
 </div>
 </body>
+<style>
+    .nav-link:hover{
+        text-decoration: underline !important
+    }
+</style>
 </html>
