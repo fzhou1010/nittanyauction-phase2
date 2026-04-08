@@ -173,3 +173,72 @@ def ask_question(seller_email, listing_id):
         return redirect(url_for('auth.login'))
     # TODO: insert question
     return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
+
+
+@listings_bp.route('/listing/<seller_email>/<int:listing_id>/pay', methods=['GET', 'POST'])
+def pay(seller_email, listing_id):
+    if 'email' not in session:
+        return redirect(url_for('auth.login'))
+
+    email = session['email']
+
+    listing = query_db(
+        'SELECT * FROM Auction_Listings WHERE Seller_Email = ? AND Listing_ID = ?',
+        [seller_email, listing_id], one=True,
+    )
+    if not listing or listing['Status'] != 2:
+        flash('This listing is not available for payment.')
+        return redirect(url_for('listings.browse'))
+
+    highest = query_db(
+        'SELECT Bidder_Email, Bid_Price FROM Bids '
+        'WHERE Seller_Email = ? AND Listing_ID = ? '
+        'ORDER BY Bid_Price DESC LIMIT 1',
+        [seller_email, listing_id], one=True,
+    )
+    if not highest or highest['Bidder_Email'] != email:
+        flash('Only the winning bidder can complete payment.')
+        return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
+
+    existing_txn = query_db(
+        'SELECT 1 FROM Transactions WHERE Seller_Email = ? AND Listing_ID = ?',
+        [seller_email, listing_id], one=True,
+    )
+    if existing_txn:
+        flash('Payment has already been completed for this auction.')
+        return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
+
+    amount = highest['Bid_Price']
+    cards = query_db('SELECT * FROM Credit_Cards WHERE Owner_email = ?', [email])
+
+    if request.method == 'GET':
+        return render_template(
+            'listings/payment.html', listing=listing, amount=amount, cards=cards,
+        )
+
+    selected_card = request.form.get('credit_card_num', '').strip()
+    valid_card = query_db(
+        'SELECT 1 FROM Credit_Cards WHERE credit_card_num = ? AND Owner_email = ?',
+        [selected_card, email], one=True,
+    )
+    if not valid_card:
+        flash('Please select a valid credit card.')
+        return render_template(
+            'listings/payment.html', listing=listing, amount=amount, cards=cards,
+        )
+
+    db = get_db()
+    from datetime import date
+    db.execute(
+        'INSERT INTO Transactions (Seller_Email, Listing_ID, Buyer_Email, Date, Payment) '
+        'VALUES (?, ?, ?, ?, ?)',
+        [seller_email, listing_id, email, date.today().isoformat(), amount],
+    )
+    db.execute(
+        'UPDATE Sellers SET balance = balance + ? WHERE email = ?',
+        [amount, seller_email],
+    )
+    db.commit()
+
+    flash('Payment successful! Transaction recorded.')
+    return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))

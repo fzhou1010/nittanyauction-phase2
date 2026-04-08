@@ -39,7 +39,8 @@
                         <h5 class="alert-heading">Auction Ended &mdash; Sold</h5>
                         {% if winner_email == session.get('email') and not has_paid %}
                             <p>You won this auction for <strong>${{ bids[0].Bid_Price }}</strong>.</p>
-                            <p class="text-muted">Payment page coming soon.</p>
+                            <a href="{{ url_for('listings.pay', seller_email=listing.Seller_Email, listing_id=listing.Listing_ID) }}"
+                               class="btn btn-success">Proceed to Payment</a>
                         {% elif winner_email == session.get('email') and has_paid %}
                             <p>You won and paid <strong>${{ bids[0].Bid_Price }}</strong>. Transaction complete.</p>
                         {% else %}
