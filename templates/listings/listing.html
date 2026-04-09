@@ -2,10 +2,10 @@
 <div class="col-md-4 mt-5">
     <div class="card">
         <div class="card-body">
-            <h6 class="card-subtitle mb-2 text-muted">{{ item.Category }}</h3>
-            <h2 class="card-title">{{ item.Auction_Title }}</h5>
+            <h6 class="card-subtitle mb-2 text-muted">{{ item.Category }}</h6>
+            <h2 class="card-title">{{ item.Auction_Title }}</h2>
             <h3 class="card-subtitle mb-2 text-muted">{{ item.Product_Name }}</h3>
-            <h6 class="card-subtitle mb-2 text-muted">Qty: {{ item.Quantity }}</h3>
+            <h6 class="card-subtitle mb-2 text-muted">Qty: {{ item.Quantity }}</h6>
             <!-- TODO: Figure out pricing formatting with last 0-->
             <p class="card-text">${{ item.Reserve_Price }}0</p>
             <a href="/listing/{{ item.Seller_Email }}/{{ item.Listing_ID }}" class="btn btn-primary">View Details</a>
