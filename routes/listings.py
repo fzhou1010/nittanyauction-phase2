@@ -10,7 +10,7 @@ def browse():
 
     categories = query_db('SELECT DISTINCT Category FROM Auction_Listings')
 
-    query = ('SELECT * FROM Auction_Listings WHERE 1=1')
+    query = ('SELECT *, (SELECT MAX(Bid_Price) FROM Bids WHERE Bids.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid FROM Auction_Listings WHERE 1=1')
     args = []
 
     if search:
