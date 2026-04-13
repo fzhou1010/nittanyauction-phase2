@@ -3,14 +3,62 @@ from db import get_db, query_db
 
 listings_bp = Blueprint('listings', __name__)
 
+
+def check_auction_complete(seller_email, listing_id):
+    """Evaluate whether an auction has reached Max_bids and resolve it.
+
+    Returns a dict describing the outcome, or None if the auction is still active.
+    Side-effect: updates Auction_Listings.Status (2=sold, 0=failed).
+    """
+    listing = query_db(
+        'SELECT * FROM Auction_Listings WHERE Seller_Email = ? AND Listing_ID = ?',
+        [seller_email, listing_id], one=True,
+    )
+    if not listing or listing['Status'] != 1:
+        return None
+
+    bid_count = query_db(
+        'SELECT COUNT(*) AS cnt FROM Bids WHERE Seller_Email = ? AND Listing_ID = ?',
+        [seller_email, listing_id], one=True,
+    )['cnt']
+
+    if bid_count < listing['Max_bids']:
+        return None
+
+    highest = query_db(
+        'SELECT Bidder_Email, Bid_Price FROM Bids '
+        'WHERE Seller_Email = ? AND Listing_ID = ? '
+        'ORDER BY Bid_Price DESC LIMIT 1',
+        [seller_email, listing_id], one=True,
+    )
+
+    db = get_db()
+    if highest['Bid_Price'] >= listing['Reserve_Price']:
+        db.execute(
+            'UPDATE Auction_Listings SET Status = 2 WHERE Seller_Email = ? AND Listing_ID = ?',
+            [seller_email, listing_id],
+        )
+        db.commit()
+        return {'status': 'sold', 'winner': highest['Bidder_Email'], 'amount': highest['Bid_Price']}
+
+    db.execute(
+        'UPDATE Auction_Listings SET Status = 0 WHERE Seller_Email = ? AND Listing_ID = ?',
+        [seller_email, listing_id],
+    )
+    db.commit()
+    return {'status': 'failed'}
+
 @listings_bp.route('/browse')
 def browse():
+    if 'email' not in session:
+        return redirect(url_for('auth.login'))
+
     search = request.args.get("q")
     category_search = request.args.get('category', '')
 
     categories = query_db('SELECT DISTINCT Category FROM Auction_Listings')
 
-    query = ('SELECT *, (SELECT MAX(Bid_Price) FROM Bids WHERE Bids.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid FROM Auction_Listings WHERE 1=1')
+    query = ('SELECT *, (SELECT MAX(Bid_Price) FROM Bids WHERE Bids.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid FROM Auction_Listings WHERE Status = 1')
     args = []
 
     if search:
@@ -60,9 +108,26 @@ def detail(seller_email, listing_id):
 
     questions = []
 
+    # Determine auction-end state for the template
+    winner_email = None
+    has_paid = False
+    bid_count = len(bids)
+    remaining_bids = listing['Max_bids'] - bid_count if listing['Max_bids'] else 0
 
-    # TODO: Q&A
-    return render_template('listings/detail.html', listing=listing, bids=bids, category_path=category_path, questions=questions)
+    if listing['Status'] == 2 and bids:
+        winner_email = bids[0]['Bidder_Email']  # bids ordered DESC by price
+        txn = query_db(
+            'SELECT 1 FROM Transactions WHERE Seller_Email = ? AND Listing_ID = ?',
+            [seller_email, listing_id], one=True,
+        )
+        has_paid = txn is not None
+
+    return render_template(
+        'listings/detail.html',
+        listing=listing, bids=bids, category_path=category_path,
+        questions=questions, winner_email=winner_email, has_paid=has_paid,
+        remaining_bids=remaining_bids,
+    )
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>/bid', methods=['POST'])
 def place_bid(seller_email, listing_id):
@@ -76,4 +141,73 @@ def ask_question(seller_email, listing_id):
     if 'email' not in session:
         return redirect(url_for('auth.login'))
     # TODO: insert question
+    return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
+
+
+@listings_bp.route('/listing/<seller_email>/<int:listing_id>/pay', methods=['GET', 'POST'])
+def pay(seller_email, listing_id):
+    if 'email' not in session:
+        return redirect(url_for('auth.login'))
+
+    email = session['email']
+
+    listing = query_db(
+        'SELECT * FROM Auction_Listings WHERE Seller_Email = ? AND Listing_ID = ?',
+        [seller_email, listing_id], one=True,
+    )
+    if not listing or listing['Status'] != 2:
+        flash('This listing is not available for payment.')
+        return redirect(url_for('listings.browse'))
+
+    highest = query_db(
+        'SELECT Bidder_Email, Bid_Price FROM Bids '
+        'WHERE Seller_Email = ? AND Listing_ID = ? '
+        'ORDER BY Bid_Price DESC LIMIT 1',
+        [seller_email, listing_id], one=True,
+    )
+    if not highest or highest['Bidder_Email'] != email:
+        flash('Only the winning bidder can complete payment.')
+        return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
+
+    existing_txn = query_db(
+        'SELECT 1 FROM Transactions WHERE Seller_Email = ? AND Listing_ID = ?',
+        [seller_email, listing_id], one=True,
+    )
+    if existing_txn:
+        flash('Payment has already been completed for this auction.')
+        return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
+
+    amount = highest['Bid_Price']
+    cards = query_db('SELECT * FROM Credit_Cards WHERE Owner_email = ?', [email])
+
+    if request.method == 'GET':
+        return render_template(
+            'listings/payment.html', listing=listing, amount=amount, cards=cards,
+        )
+
+    selected_card = request.form.get('credit_card_num', '').strip()
+    valid_card = query_db(
+        'SELECT 1 FROM Credit_Cards WHERE credit_card_num = ? AND Owner_email = ?',
+        [selected_card, email], one=True,
+    )
+    if not valid_card:
+        flash('Please select a valid credit card.')
+        return render_template(
+            'listings/payment.html', listing=listing, amount=amount, cards=cards,
+        )
+
+    db = get_db()
+    from datetime import date
+    db.execute(
+        'INSERT INTO Transactions (Seller_Email, Listing_ID, Buyer_Email, Date, Payment) '
+        'VALUES (?, ?, ?, ?, ?)',
+        [seller_email, listing_id, email, date.today().isoformat(), amount],
+    )
+    db.execute(
+        'UPDATE Sellers SET balance = balance + ? WHERE email = ?',
+        [amount, seller_email],
+    )
+    db.commit()
+
+    flash('Payment successful! Transaction recorded.')
     return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
