@@ -198,5 +198,76 @@ def logout():
 def profile():
     if 'email' not in session:
         return redirect(url_for('auth.login'))
-    # TODO: profile view/edit
-    return render_template('auth/profile.html')
+
+    user_email = session['email']
+    db = get_db()
+
+    user_info = query_db('''
+        SELECT first_name, last_name, age, major, home_address_id 
+        FROM Bidders 
+        WHERE email = ?''', [user_email], one=True)
+
+    address_info = None
+    if user_info and user_info['home_address_id']:
+        address_info = query_db('''
+            SELECT a.*, z.city, z.state
+            FROM Address a
+            JOIN Zipcode_Info z ON a.zipcode = z.zipcode
+            WHERE a.address_id = ?''', [user_info['home_address_id']], one=True)
+
+    cards = query_db('SELECT * FROM Credit_Cards WHERE Owner_email = ?', [user_email])
+
+    if request.method == 'POST':
+        form_type = request.form.get('form_type')
+
+        if form_type == 'update_address':
+            street_num = request.form.get('street_num')
+            street_name = request.form.get('street_name')
+            zipcode = request.form.get('zipcode')
+            city = request.form.get('city')
+            state = request.form.get('state')
+
+            db.execute('INSERT OR IGNORE INTO Zipcode_Info (zipcode, city, state) VALUES (?, ?, ?)', 
+                       [zipcode, city, state])
+
+            db.execute('''
+                UPDATE Address
+                SET street_num = ?, street_name = ?, zipcode = ?
+                WHERE address_id = ?''',
+                [street_num, street_name, zipcode, user_info['home_address_id']])
+            
+            db.commit()
+            flash('Address updated successfully!', 'success')
+
+        elif form_type == 'change_password':
+            old_password = request.form.get('old_password')
+            new_password = request.form.get('new_password')
+
+            user_account = query_db('SELECT password FROM Users WHERE email = ?', [user_email], one=True)
+
+            current_hashed = hashlib.sha256(old_password.encode('utf-8')).hexdigest()
+            if user_account and user_account['password'] == current_hashed:
+                hashed_new = hashlib.sha256(new_password.encode('utf-8')).hexdigest()
+                db.execute('UPDATE Users SET password = ? WHERE email = ?', [hashed_new, user_email])
+                db.commit()
+                flash('Password changed successfully!', 'success')
+            else:
+                flash('Incorrect current password.', 'danger')
+
+        elif form_type == 'add_card':
+            credit_card_num = request.form.get('credit_card_num')
+            card_type = request.form.get('card_type')
+            expire_month = request.form.get('expire_month')
+            expire_year = request.form.get('expire_year')
+            security_code = request.form.get('security_code')
+
+            db.execute('''
+                INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email) 
+                VALUES (?, ?, ?, ?, ?, ?)''',
+                [credit_card_num, card_type, expire_month, expire_year, security_code, user_email])
+            db.commit()
+            flash('Card added successfully!', 'success')
+
+        return redirect(url_for('auth.profile'))
+
+    return render_template('auth/profile.html', user=user_info, address=address_info, cards=cards)

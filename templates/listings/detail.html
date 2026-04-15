@@ -84,14 +84,23 @@
         <div class="card mb-3">
             <div class="card-body">
                 <h2>Questions</h2>
-                {% if questions %}
-                {% for q in questions %}
-                <p><strong>Q:</strong> {{ q.question }}</p>
-                <p><strong>A:</strong> {{ q.answer or 'Pending' }}</p>
-                {% endfor %}
-                {% else %}
-                <p>No questions yet.</p>
-                {% endif %}
+                    {% if questions %}
+                        {% for q in questions %}
+                            <div class="mb-3">
+                                <p>
+                                    <strong>Q:</strong> {{ q.question_text }} 
+                                    <small class="text-muted">- {{ q.question_time }}</small>
+                                </p>
+                                
+                                <!-- Only show the A: line if answer_text is not null/empt-->
+                                {% if q.answer_text %}
+                                    <p><strong>A:</strong> {{ q.answer_text }}</p>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p>No questions yet.</p>
+                    {% endif %}
                 
                 <form action="{{ url_for('listings.ask_question', seller_email=listing.Seller_Email, listing_id=listing.Listing_ID) }}" method="post">
                     <textarea name="question" placeholder="Ask a question" required></textarea>
