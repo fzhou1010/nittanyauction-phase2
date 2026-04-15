@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Complete Payment - NittanyAuction{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0">Complete Your Payment</h4>
+            </div>
+            <div class="card-body">
+                <h5>{{ listing.Auction_Title }}</h5>
+                <p class="text-muted">{{ listing.Product_Name }}</p>
+                <hr>
+                <p><strong>Amount Due:</strong> <span class="h4 text-success">${{ '%.2f'|format(amount) }}</span></p>
+                <p><strong>Seller:</strong> {{ listing.Seller_Email }}</p>
+
+                {% if cards %}
+                <form method="post">
+                    <div class="mb-3">
+                        <label class="form-label" for="credit_card_num">Select Payment Method</label>
+                        <select name="credit_card_num" id="credit_card_num" class="form-select" required>
+                            <option value="" disabled selected>Choose a card</option>
+                            {% for card in cards %}
+                            <option value="{{ card.credit_card_num }}">
+                                {{ card.card_type }} ending in {{ card.credit_card_num[-4:] }}
+                                (exp {{ card.expire_month }}/{{ card.expire_year }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">Pay ${{ '%.2f'|format(amount) }}</button>
+                </form>
+                {% else %}
+                <div class="alert alert-warning">
+                    You have no credit cards on file. Please add one before completing payment.
+                </div>
+                {% endif %}
+
+                <a href="{{ url_for('listings.detail', seller_email=listing.Seller_Email, listing_id=listing.Listing_ID) }}"
+                   class="btn btn-outline-secondary w-100 mt-2">Back to Listing</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

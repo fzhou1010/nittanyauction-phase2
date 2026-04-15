@@ -24,8 +24,11 @@ def get_user_roles(email):
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        email = request.form['email'] 
+        email = request.form['email']
         password = request.form['password']
+
+        # Clear any existing session so a failed login doesn't mean that a user ahs logged in
+        session.clear()
 
         # Hash the entered password with SHA256 to compare against the stored hash
         hashed = hashlib.sha256(password.encode('utf-8')).hexdigest()
