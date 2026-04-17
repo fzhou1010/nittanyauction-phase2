@@ -165,12 +165,13 @@ CREATE TABLE IF NOT EXISTS Watchlist (
     FOREIGN KEY (category) REFERENCES Categories(category_name)
 );
 
-CREATE TABLE IF NOT EXISTS Shopping_Cart(
-    cart_id INTEGER,
-    bidder_email TEXT NOT NULL,
-    seller_email TEXT NOT NULL,
+-- Shopping Cart: bidders save listings for quick access and direct bidding
+CREATE TABLE IF NOT EXISTS Shopping_Cart (
+    Bidder_Email TEXT NOT NULL,
+    Seller_Email TEXT NOT NULL,
     Listing_ID INTEGER NOT NULL,
-    PRIMARY KEY (cart_id),
-    FOREIGN KEY (Bidder_email) REFERENCES Bidders(email),
-    FOREIGN KEY (Seller_Email, Listing_ID) REFERENCES Auction_Listings(Seller_Email, Listing_ID)
-)
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (Bidder_Email, Seller_Email, Listing_ID),
+    FOREIGN KEY (Bidder_Email) REFERENCES Bidders(email) ON DELETE CASCADE,
+    FOREIGN KEY (Seller_Email, Listing_ID) REFERENCES Auction_Listings(Seller_Email, Listing_ID) ON DELETE CASCADE
+);

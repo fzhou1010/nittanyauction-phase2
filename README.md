@@ -36,7 +36,7 @@ Follows the provided relational schema. Composite PK on `Auction_Listings(Seller
 
 Auctions end by bid count (`Max_bids`), not time. Status: `1` active, `0` inactive, `2` sold.
 
-Two tables added for our Phase 1 features: `Questions` (product Q&A) and `Watchlist` (saved search alerts). No CSV data for these, populated through the app.
+Two Phase 1 tables (`Questions` for product Q&A, `Watchlist` for saved search alerts) plus `Shopping_Cart` (saved listings, composite FK to `Auction_Listings`) for the Phase 2 cart feature. No CSV data for these, populated through the app.
 
 ## Auth
 
