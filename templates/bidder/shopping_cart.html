@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}My Shopping Cart - NittanyAuction{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">My Shopping Cart</h2>
+    <a href="{{ url_for('listings.browse') }}" class="btn btn-outline-primary btn-sm">Browse Listings</a>
+</div>
+
+{% with messages = get_flashed_messages() %}
+    {% if messages %}
+        {% for m in messages %}
+            <div class="alert alert-info py-2">{{ m }}</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+{% if not items %}
+    <div class="card">
+        <div class="card-body text-center text-muted py-5">
+            <p class="mb-2">Your shopping cart is empty.</p>
+            <p class="small">Add listings from the detail page to keep track of them here.</p>
+        </div>
+    </div>
+{% else %}
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Listing</th>
+                    <th>Seller</th>
+                    <th>Current Bid</th>
+                    <th>Remaining</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('listings.detail', seller_email=item.seller_email, listing_id=item.listing_id) }}">
+                            {{ item.title }}
+                        </a>
+                        <div class="small text-muted">{{ item.category }}</div>
+                    </td>
+                    <td class="small">{{ item.seller_email }}</td>
+                    <td>
+                        {% if item.current_bid %}
+                            ${{ item.current_bid }}
+                        {% else %}
+                            <span class="text-muted">No bids</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.status == 1 %}
+                            {{ item.remaining_bids }} bid{{ 's' if item.remaining_bids != 1 }} left
+                        {% else %}
+                            <span class="text-muted">&mdash;</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.status == 1 %}
+                            <span class="badge bg-success">{{ item.status_label }}</span>
+                        {% elif item.status == 2 %}
+                            <span class="badge bg-secondary">{{ item.status_label }}</span>
+                        {% else %}
+                            <span class="badge bg-light text-dark">{{ item.status_label }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <form action="{{ url_for('bidder.cart_remove') }}" method="post" class="d-inline">
+                            <input type="hidden" name="seller_email" value="{{ item.seller_email }}">
+                            <input type="hidden" name="listing_id" value="{{ item.listing_id }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}
+{% endblock %}
