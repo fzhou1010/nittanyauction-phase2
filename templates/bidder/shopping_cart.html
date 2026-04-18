@@ -32,11 +32,13 @@
                     <th>Current Bid</th>
                     <th>Remaining</th>
                     <th>Status</th>
+                    <th>Quick Bid</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in items %}
+                {% set min_bid = (item.current_bid|int + 1) if item.current_bid else 1 %}
                 <tr>
                     <td>
                         <a href="{{ url_for('listings.detail', seller_email=item.seller_email, listing_id=item.listing_id) }}">
@@ -66,6 +68,19 @@
                             <span class="badge bg-secondary">{{ item.status_label }}</span>
                         {% else %}
                             <span class="badge bg-light text-dark">{{ item.status_label }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.status == 1 %}
+                        <form action="{{ url_for('listings.place_bid', seller_email=item.seller_email, listing_id=item.listing_id) }}" method="post" class="d-flex">
+                            <div class="input-group input-group-sm" style="max-width: 180px;">
+                                <span class="input-group-text">$</span>
+                                <input type="number" name="bid_amount" class="form-control"
+                                       step="1" min="{{ min_bid }}" required
+                                       placeholder="Min ${{ min_bid }}">
+                                <button type="submit" class="btn btn-primary">Bid</button>
+                            </div>
+                        </form>
                         {% endif %}
                     </td>
                     <td class="text-end">

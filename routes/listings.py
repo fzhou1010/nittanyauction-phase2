@@ -127,11 +127,16 @@ def detail(seller_email, listing_id):
         )
         has_paid = txn is not None
 
+    in_cart = query_db(
+        'SELECT 1 FROM Shopping_Cart WHERE Bidder_Email = ? AND Seller_Email = ? AND Listing_ID = ?',
+        [session['email'], seller_email, listing_id], one=True,
+    ) is not None
+
     return render_template(
         'listings/detail.html',
         listing=listing, bids=bids, category_path=category_path,
         questions=questions, winner_email=winner_email, has_paid=has_paid,
-        remaining_bids=remaining_bids,
+        remaining_bids=remaining_bids, in_cart=in_cart,
     )
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>/bid', methods=['POST'])
