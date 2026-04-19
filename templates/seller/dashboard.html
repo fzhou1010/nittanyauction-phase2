@@ -1,7 +1,97 @@
 {% extends "base.html" %}
+{% block title %}Seller Dashboard{% endblock %}
 {% block content %}
-<h3>seller / dashboard</h3>
-<p class="text-muted">TODO</p>
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 text-center mb-5">
+        <h2 class="">Seller Dashboard</h2>
+    </div>
+    <!-- Hero Section : Quick Access to some Aggregate Data-->
+    <div class="row col-md-8">
+        <div class="col-md-4 mb-3">
+            <div class="card h-100 text-center p-3 role-card">
+                
+                <div class="card-body">
+                    <div class="card-title fs-3"><strong>$ {{bal['balance']}}</strong></div>
+                    <div class="card-text">Current Balance</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100 text-center p-3 role-card">
+                <div class="card-body">
+                    {% if seller_rating['count'] > 0 %}
+                        <div class="card-title fs-3"><strong>{{seller_rating['avg_rating']}}/5</strong></div>
+                        <div class="card-text">{{seller_rating['count']}} Ratings</div>
+                    {% else %}
+                        <div class="card-title fs-3"><strong>No Ratings</strong></div>
+                    {%endif%}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <a class="text-decoration-none" href="{{url_for('seller.questions')}}">
+            <div class="card h-100 text-center p-3 role-card">
+                <div class="card-body">
+                    <div class="card-title fs-3"><strong>{{q_count['q_count']}}</strong></div>
+                    <div class="card-text">Unanswered Questions</div>
+                </div>
+            </div>
+            </a>
+        </div>
+    </div>
+    <!-- Listing Dashboard -->
+    <div class="table-responsive mt-3">       
+        <table class="table table-hover align-middle">                                                        
+            <thead class="table-light">                                                                      
+                <tr>                                                                                          
+                    <th>Auction Title</th>                                                                    
+                    <th>Product</th>           
+                    <th>Category</th>                                                                         
+                    <th class="text-center">Bids</th>
+                    <th class="text-end">Highest Bid</th>                                                     
+                    <th class="text-end">Reserve</th>
+                    <th></th>                                                                                 
+                </tr>                          
+            </thead>                                                                                          
+            <tbody>                        
+                {% for listing in active_listings %}                                                          
+                <tr>                       
+                    <td>{{ listing['Auction_Title'] }}</td>                                                   
+                    <td>{{ listing['Product_Name'] }}</td>
+                    <td>{{ listing['Category'] }}</td>                
+                    <td class="text-center">{{ listing['bid_count'] }} / {{ listing['Max_bids'] }}</td>
+                    <td class="text-end">
+                        <!-- Should display the highest bid of the product, or no bid --> 
+                        {% if listing['highest_bid'] %}
+                            ${{ "%.2f"|format(listing['highest_bid']) }}                                      
+                        {% else %}         
+                            <span class="text-muted">No bids</span>                                           
+                        {% endif %}                                                                           
+                    </td>            
+                    <td class="text-end">${{ "%.2f"|format(listing['Reserve_Price']) }}</td>                  
+                    <td>                   
+                        <a href="{{ url_for('listings.detail', seller_email=session['email'], listing_id=listing['Listing_ID']) }}"                                                                     
+                            class="btn btn-sm btn-outline-primary">View</a>
+                    </td>                                                                                  
+                </tr>
+                <tr>
+                    <td colspan="7" class="text-center text-muted p-3">                                                             
+                        <a href="{{ url_for('seller.list_product') }}">List another product</a>
+                    </td>  
+                </tr>                      
+                {% else %}                 
+                <tr>                                                                                          
+                    <td colspan="7" class="text-center text-muted py-4">
+                        No active listings yet.                                                               
+                        <a href="{{ url_for('seller.list_product') }}">List a product</a> to get started.
+                    </td>                                                                                     
+                </tr>                          
+                {% endfor %}                                                                                  
+            </tbody>                      
+        </table>                                                                                              
+    </div>    
+</div>
+
 {% endblock %}
 
-{% make the rating system here %}
+<!-- make the rating system here -->

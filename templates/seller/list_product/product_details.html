@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}List a Product - Step 2{% endblock %}
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8">
+        <!-- Progress bar -->
+        <div class="d-flex justify-content-between mb-2">
+            <small><strong>Step 2 of 4</strong></small>
+        </div>
+        <div class="progress mb-4" style="height: 8px;">
+            <div class="progress-bar" style="width: 50%"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title mb-3">Please describe your product Below</h3>
+                <p class="text-muted">
+                    Category: <span class="badge bg-secondary">{{ listing['category'] }}</span>
+                </p>
+
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Auction Title</label>
+                        <input type="text" name="auction_title" class="form-control"
+                               value="{{ listing.get('auction_title', '') }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Product Name</label>
+                        <input type="text" name="product_name" class="form-control"
+                               value="{{ listing.get('product_name', '') }}" 
+                               placeholder="Please include the full product name. E.g. Dell U2725QE"
+                               required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="product_description" class="form-control" rows="4"
+                                  placeholder="Please describe the product, its condition, etc.">{{ listing.get('product_description', '') }}</textarea>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Condition</label>
+                        <select class="form-select" name="condition">
+                            <option value="/">Please Select a Condition for your Product</option>
+                            <option value="new">New</option>
+                            <option value="slightly-used">Slightly Used</option>
+                            <option value="used">Used</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Quantity</label>
+                        <input type="number" name="quantity" class="form-control" min="1"
+                               value="{{ listing.get('quantity', '1') }}" required style="max-width: 150px;">
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{{ url_for('seller.list_product') }}" class="btn btn-outline-secondary">Back</a>
+                        <button type="submit" class="btn btn-primary">Next</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

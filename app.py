@@ -24,8 +24,16 @@ app.register_blueprint(helpdesk_bp, url_prefix='/helpdesk')  # /helpdesk/welcome
 @app.route('/')
 def index():
     # If already logged in, go to listings; otherwise go to login page
-    if 'email' in session:
-        return redirect(url_for('listings.browse'))
+    
+    if 'roles' not in session:
+        return redirect(url_for('auth.login'))
+    if 'helpdesk' in session['roles']:                                                                                                                       
+        return redirect(url_for('helpdesk.welcome'))
+    elif 'seller' in session['roles']:                                                                                                                       
+        return redirect(url_for('seller.dashboard'))
+    else:                                                                                                                                                    
+        return redirect(url_for('bidder.welcome'))
+    
     return redirect(url_for('auth.login'))
 
 if __name__ == '__main__':

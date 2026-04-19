@@ -145,8 +145,10 @@ CREATE TABLE IF NOT EXISTS Questions (
     Seller_Email TEXT NOT NULL,
     Listing_ID INTEGER NOT NULL,
     Bidder_Email TEXT NOT NULL,
+    question_title TEXT NOT NULL,
     question_text TEXT NOT NULL,
     answer_text TEXT,
+    answered INTEGER DEFAULT 0, -- whether the question has been answered or not
     question_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (Seller_Email, Listing_ID) REFERENCES Auction_Listings(Seller_Email, Listing_ID),
     FOREIGN KEY (Bidder_Email) REFERENCES Bidders(email)
@@ -158,8 +160,8 @@ CREATE TABLE IF NOT EXISTS Watchlist (
     Bidder_Email TEXT NOT NULL,
     category TEXT NOT NULL,
     max_price REAL NOT NULL CHECK(max_price > 0), --maximum price the user wants to keep track of the product until
-    condition TEXT CHECK(condition IN ('New', 'Lightly Used', 'Used') OR condition IS NULL), --condition of the
-    PRIMARY KEY (watchlist_id),product that you want it in
+    condition TEXT CHECK(condition IN ('New', 'Lightly Used', 'Used') OR condition IS NULL), --condition of the product that you want it in
+    PRIMARY KEY (watchlist_id),
     UNIQUE(Bidder_Email, category, max_price, condition),
     FOREIGN KEY (Bidder_Email) REFERENCES Bidders(email) ON DELETE CASCADE,
     FOREIGN KEY (category) REFERENCES Categories(category_name)
