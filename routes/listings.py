@@ -222,7 +222,17 @@ def place_bid(seller_email, listing_id):
     if auction['Max_bids'] and current_bids['total'] >= auction['Max_bids']:
         flash('This listing has reached the maximum number of bids and is now closed.', 'danger')
         return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
-    
+
+    # Turn-taking rule: same bidder cannot place consecutive bids on the same listing
+    last_bidder = query_db(
+        'SELECT Bidder_Email FROM Bids WHERE Seller_Email = ? AND Listing_ID = ? '
+        'ORDER BY Bid_ID DESC LIMIT 1',
+        [seller_email, listing_id], one=True,
+    )
+    if last_bidder and last_bidder['Bidder_Email'] == user_email:
+        flash('You cannot place consecutive bids — wait for another bidder first.', 'danger')
+        return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
+
     # if there are no bids yet, the minimum required bid is the reserve price (or 0 if no reserve). Otherwise, it must be at least $1 higher than the current highest bid.
     if current_bids['highest_bid'] is None:
         min_required = auction['Reserve_Price'] or 0.0
