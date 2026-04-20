@@ -141,7 +141,40 @@ def auction_history():
         [email, email],
     )
 
-    return render_template('bidder/auction_history.html', won=won)
+    # Bid history: one row per listing the bidder has touched, with their top bid vs the current leader.
+    bids = query_db(
+        '''
+        SELECT
+            al.Seller_Email, al.Listing_ID, al.Auction_Title, al.Category, al.Status,
+            MAX(b.Bid_Price) AS my_highest_bid,
+            (SELECT MAX(Bid_Price) FROM Bids b2
+                WHERE b2.Seller_Email = al.Seller_Email AND b2.Listing_ID = al.Listing_ID) AS current_bid,
+            MAX(b.Bid_ID) AS latest_bid_id
+        FROM Bids b
+        JOIN Auction_Listings al
+            ON al.Seller_Email = b.Seller_Email AND al.Listing_ID = b.Listing_ID
+        WHERE b.Bidder_Email = ?
+        GROUP BY al.Seller_Email, al.Listing_ID
+        ORDER BY (al.Status = 1) DESC, latest_bid_id DESC
+        ''',
+        [email],
+    )
+
+    bid_rows = []
+    for b in bids:
+        bid_rows.append({
+            'seller_email': b['Seller_Email'],
+            'listing_id': b['Listing_ID'],
+            'title': b['Auction_Title'],
+            'category': b['Category'],
+            'status': b['Status'],
+            'status_label': STATUS_LABELS.get(b['Status'], 'Unknown'),
+            'my_highest_bid': b['my_highest_bid'],
+            'current_bid': b['current_bid'],
+            'leading': b['my_highest_bid'] == b['current_bid'],
+        })
+
+    return render_template('bidder/auction_history.html', won=won, bids=bid_rows)
 
 @bidder_bp.route('/rate/<seller_email>', methods=['GET', 'POST'])
 def rate_seller(seller_email):
