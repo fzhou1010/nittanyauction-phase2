@@ -19,10 +19,97 @@ def credit_cards():
     # TODO: list/add/remove credit cards
     return render_template('bidder/credit_cards.html')
 
+CONDITION_CHOICES = ('New', 'Lightly Used', 'Used')
+
+
 @bidder_bp.route('/watchlist')
 def watchlist():
-    # TODO: list/add/remove watchlist entries
-    return render_template('bidder/watchlist.html')
+    email = session['email']
+
+    entries = query_db(
+        'SELECT watchlist_id, category, max_price, condition '
+        'FROM Watchlist WHERE Bidder_Email = ? ORDER BY watchlist_id DESC',
+        [email],
+    )
+
+    # Current active listings that match any of the bidder's watchlist rows (by category + price).
+    matches = query_db(
+        '''
+        SELECT DISTINCT
+            al.Seller_Email, al.Listing_ID, al.Auction_Title, al.Product_Name,
+            al.Category, al.Reserve_Price,
+            (SELECT MAX(Bid_Price) FROM Bids b
+                WHERE b.Seller_Email = al.Seller_Email AND b.Listing_ID = al.Listing_ID) AS current_bid
+        FROM Auction_Listings al
+        JOIN Watchlist w
+          ON w.category = al.Category
+         AND w.Bidder_Email = ?
+         AND al.Reserve_Price <= w.max_price
+        WHERE al.Status = 1
+        ORDER BY al.Listing_ID DESC
+        ''',
+        [email],
+    )
+
+    categories = query_db('SELECT category_name FROM Categories ORDER BY category_name')
+
+    return render_template(
+        'bidder/watchlist.html',
+        entries=entries, matches=matches,
+        categories=categories, condition_choices=CONDITION_CHOICES,
+    )
+
+
+@bidder_bp.route('/watchlist/add', methods=['POST'])
+def watchlist_add():
+    category = request.form.get('category', '').strip()
+    max_price_raw = request.form.get('max_price', '').strip()
+    condition = request.form.get('condition', '').strip() or None
+
+    if not category:
+        flash('Please choose a category.')
+        return redirect(url_for('bidder.watchlist'))
+    try:
+        max_price = float(max_price_raw)
+        if max_price <= 0:
+            raise ValueError
+    except ValueError:
+        flash('Max price must be a positive number.')
+        return redirect(url_for('bidder.watchlist'))
+    if condition and condition not in CONDITION_CHOICES:
+        flash('Invalid condition.')
+        return redirect(url_for('bidder.watchlist'))
+
+    db = get_db()
+    try:
+        db.execute(
+            'INSERT INTO Watchlist (Bidder_Email, category, max_price, condition) '
+            'VALUES (?, ?, ?, ?)',
+            [session['email'], category, max_price, condition],
+        )
+        db.commit()
+        flash('Added to watchlist.')
+    except Exception:
+        # UNIQUE(Bidder_Email, category, max_price, condition) already has this row.
+        flash('You already have that watchlist entry.')
+
+    return redirect(url_for('bidder.watchlist'))
+
+
+@bidder_bp.route('/watchlist/remove', methods=['POST'])
+def watchlist_remove():
+    watchlist_id = request.form.get('watchlist_id', '').strip()
+    if not watchlist_id:
+        return redirect(url_for('bidder.watchlist'))
+
+    db = get_db()
+    db.execute(
+        'DELETE FROM Watchlist WHERE watchlist_id = ? AND Bidder_Email = ?',
+        [watchlist_id, session['email']],
+    )
+    db.commit()
+    flash('Removed from watchlist.')
+    return redirect(url_for('bidder.watchlist'))
 
 @bidder_bp.route('/cart')
 def shopping_cart():

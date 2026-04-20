@@ -1,5 +1,117 @@
 {% extends "base.html" %}
+{% block title %}Watchlist - NittanyAuction{% endblock %}
+
 {% block content %}
-<h3>bidder / watchlist</h3>
-<p class="text-muted">TODO</p>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Watchlist</h2>
+    <a href="{{ url_for('listings.browse') }}" class="btn btn-outline-primary btn-sm">Browse Listings</a>
+</div>
+
+<p class="text-muted small">
+    Get notified when a new listing matches your saved search (category + max reserve price).
+    Condition is a personal note — matching uses category and price only.
+</p>
+
+<div class="card mb-4">
+    <div class="card-header">Add a search</div>
+    <div class="card-body">
+        <form method="post" action="{{ url_for('bidder.watchlist_add') }}" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small">Category</label>
+                <select class="form-select form-select-sm" name="category" required>
+                    <option value="">-- choose --</option>
+                    {% for c in categories %}
+                    <option value="{{ c.category_name }}">{{ c.category_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Max price</label>
+                <input type="number" class="form-control form-control-sm" name="max_price"
+                       step="0.01" min="0.01" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Condition (optional)</label>
+                <select class="form-select form-select-sm" name="condition">
+                    <option value="">Any</option>
+                    {% for c in condition_choices %}
+                    <option value="{{ c }}">{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm w-100">Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<h5 class="text-muted mb-2">Saved Searches <span class="text-muted">({{ entries|length }})</span></h5>
+{% if not entries %}
+    <div class="alert alert-light text-center py-3">No saved searches yet.</div>
+{% else %}
+    <div class="table-responsive mb-4">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Max Price</th>
+                    <th>Condition</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in entries %}
+                <tr>
+                    <td>{{ e.category }}</td>
+                    <td>${{ '%.2f' % e.max_price }}</td>
+                    <td>{{ e.condition or '—' }}</td>
+                    <td class="text-end">
+                        <form method="post" action="{{ url_for('bidder.watchlist_remove') }}" class="m-0">
+                            <input type="hidden" name="watchlist_id" value="{{ e.watchlist_id }}">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">Remove</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}
+
+<h5 class="text-muted mb-2">Current Matches <span class="text-muted">({{ matches|length }})</span></h5>
+{% if not matches %}
+    <div class="alert alert-light text-center py-3">Nothing active matches your watchlist right now.</div>
+{% else %}
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Listing</th>
+                    <th>Seller</th>
+                    <th>Category</th>
+                    <th>Reserve</th>
+                    <th>Current Bid</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in matches %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('listings.detail', seller_email=m.Seller_Email, listing_id=m.Listing_ID) }}">
+                            {{ m.Auction_Title or m.Product_Name }}
+                        </a>
+                    </td>
+                    <td class="small">{{ m.Seller_Email }}</td>
+                    <td>{{ m.Category }}</td>
+                    <td>${{ '%.2f' % m.Reserve_Price }}</td>
+                    <td>
+                        {% if m.current_bid %}${{ '%.2f' % m.current_bid }}{% else %}<span class="text-muted">No bids</span>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}
 {% endblock %}
