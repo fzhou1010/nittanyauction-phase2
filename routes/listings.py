@@ -249,18 +249,19 @@ def place_bid(seller_email, listing_id):
         INSERT INTO Bids (Seller_Email, Listing_ID, Bidder_Email, Bid_Price)
         VALUES (?, ?, ?, ?)
     ''', (seller_email, listing_id, user_email, bid_amount))
-
-    #if the bid reaches max_bids, close the auction
-    if auction['Max_bids'] and current_bids['total'] + 1 >= auction['Max_bids']:
-        db.execute('''
-            UPDATE Auction_Listings
-            SET Status = 0
-            WHERE Seller_Email = ? AND Listing_ID = ?
-        ''', (seller_email, listing_id))
-    
     db.commit()
 
-    flash('Your bid has been placed.', 'success')
+    # Auction may have just reached Max_bids — resolve to Sold (reserve met) or Failed.
+    outcome = check_auction_complete(seller_email, listing_id)
+    if outcome and outcome['status'] == 'sold':
+        if outcome['winner'] == user_email:
+            flash('You won the auction! Complete payment to finalize.', 'success')
+        else:
+            flash('Your bid was placed, but another bidder won the auction.', 'info')
+    elif outcome and outcome['status'] == 'failed':
+        flash('Auction ended — reserve price was not met.', 'warning')
+    else:
+        flash('Your bid has been placed.', 'success')
     return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>/question', methods=['POST'])
