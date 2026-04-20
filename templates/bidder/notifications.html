@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Notifications - NittanyAuction{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Notifications</h2>
+    {% if notifications %}
+    <form method="post" action="{{ url_for('bidder.notifications_mark_read') }}" class="m-0">
+        <button type="submit" class="btn btn-outline-secondary btn-sm">Mark all as read</button>
+    </form>
+    {% endif %}
+</div>
+
+{% if not notifications %}
+    <div class="alert alert-light text-center py-4">You have no notifications.</div>
+{% else %}
+    <div class="list-group">
+        {% for n in notifications %}
+        <div class="list-group-item {% if not n.is_read %}list-group-item-primary{% endif %}">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="me-3">
+                    <div class="small text-muted mb-1">
+                        {{ n.created_at }}
+                        {% if not n.is_read %}<span class="badge bg-primary ms-2">New</span>{% endif %}
+                    </div>
+                    <div>
+                        {% if n.seller_email and n.listing_id %}
+                            <a href="{{ url_for('listings.detail', seller_email=n.seller_email, listing_id=n.listing_id) }}">
+                                {{ n.message }}
+                            </a>
+                        {% else %}
+                            {{ n.message }}
+                        {% endif %}
+                    </div>
+                </div>
+                {% if not n.is_read %}
+                <form method="post" action="{{ url_for('bidder.notifications_mark_read') }}" class="m-0">
+                    <input type="hidden" name="notification_id" value="{{ n.notification_id }}">
+                    <button type="submit" class="btn btn-link btn-sm">Mark read</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% endif %}
+{% endblock %}
