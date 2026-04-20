@@ -251,8 +251,6 @@ def place_bid(seller_email, listing_id):
     db.commit()
 
     flash('Your bid has been placed.', 'success')
-    
-    # TODO: bid validation + insertion, max_bids auto-close
     return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>/question', methods=['POST'])
