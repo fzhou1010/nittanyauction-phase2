@@ -1,29 +1,97 @@
 {% extends "base.html" %}
+{% block title %}Browse - NittanyAuction{% endblock %}
+
 {% block content %}
 {% import "listings/listing.html" as listing_macro %}
-<h3>Listings / Browse</h3>
-<div class="col-md-4 mt-5"> 
-    <form method="GET">
-        <div class="d-flex flex-column gap-1 mb-3">
-            <label class="form-label">Search</label>
-            <input type="text" name="q" class="form-control me-3 required" value="{{ request.args.get('q', '') }}">
-            <select name="category" class="form-select" style="max-width: 200px;">
-                <option value="">All Categories</option>
-                {% for cat in categories %}
-                    <option value="{{ cat['category_name'] }}" 
-                        {% if request.args.get('category') == cat['Category'] %}selected{% endif %}>
-                        {{ cat['Category'] }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-        <button class="btn btn-primary w-100">Search</button>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Browse Listings</h3>
+    <form method="GET" class="d-flex" style="max-width: 360px;">
+        <input type="text" name="q" class="form-control me-2"
+               value="{{ search if mode == 'search' else '' }}"
+               placeholder="Search title or product">
+        <button class="btn btn-primary">Search</button>
     </form>
 </div>
 
-<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-    {% for listing in listings %}
-        {{ listing_macro.render_listing(listing) }}
-    {% endfor %}
-</div>
+{% if mode == 'search' %}
+    <p class="text-muted">
+        {{ listings|length }} result{{ 's' if listings|length != 1 }} for &ldquo;{{ search }}&rdquo;
+        &middot; <a href="{{ url_for('listings.browse') }}">Back to categories</a>
+    </p>
+
+    {% if listings %}
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            {% for listing in listings %}
+                {{ listing_macro.render_listing(listing) }}
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-light text-center py-4">No listings match your search.</div>
+    {% endif %}
+
+{% else %}
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                {% if current_category %}
+                    <a href="{{ url_for('listings.browse') }}">All</a>
+                {% else %}
+                    All
+                {% endif %}
+            </li>
+            {% for cat in category_path %}
+                {% if loop.last %}
+                    <li class="breadcrumb-item active">{{ cat }}</li>
+                {% else %}
+                    <li class="breadcrumb-item">
+                        <a href="{{ url_for('listings.browse', category=cat) }}">{{ cat }}</a>
+                    </li>
+                {% endif %}
+            {% endfor %}
+        </ol>
+    </nav>
+
+    {% if subcategories %}
+        <h5 class="text-muted mb-3">
+            {% if current_category %}Subcategories{% else %}Categories{% endif %}
+        </h5>
+        <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mb-4">
+            {% for sub in subcategories %}
+                <div class="col">
+                    <a href="{{ url_for('listings.browse', category=sub.category_name) }}"
+                       class="card text-decoration-none h-100">
+                        <div class="card-body py-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="text-body">{{ sub.category_name }}</span>
+                                <span class="text-muted">&rsaquo;</span>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% if current_category %}
+        <h5 class="text-muted mb-3">
+            Listings in {{ current_category }}
+            <span class="text-muted">({{ listings|length }})</span>
+        </h5>
+        {% if listings %}
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+                {% for listing in listings %}
+                    {{ listing_macro.render_listing(listing) }}
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-light text-center py-4">
+                No active listings in this category.
+                {% if subcategories %}Try one of the subcategories above.{% endif %}
+            </div>
+        {% endif %}
+    {% elif not subcategories %}
+        <div class="alert alert-warning">No categories available.</div>
+    {% endif %}
+{% endif %}
 {% endblock %}
