@@ -48,30 +48,76 @@ def check_auction_complete(seller_email, listing_id):
     db.commit()
     return {'status': 'failed'}
 
+ROOT_PARENT = 'Root'  # sentinel for top-level categories in Categories.parent_category
+
+
 @listings_bp.route('/browse')
 def browse():
     if 'email' not in session:
         return redirect(url_for('auth.login'))
 
-    search = request.args.get("q")
-    category_search = request.args.get('category', '')
+    search = (request.args.get('q') or '').strip()
+    category = (request.args.get('category') or '').strip()
 
-    categories = query_db('SELECT DISTINCT Category FROM Auction_Listings')
-
-    query = ('SELECT *, (SELECT MAX(Bid_Price) FROM Bids WHERE Bids.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid FROM Auction_Listings WHERE Status = 1')
-    args = []
-
+    # Flat search bypasses the hierarchy entirely
     if search:
-        query += (' AND (Auction_Title LIKE ? OR Product_Name LIKE ?)')
-        args.extend([f'%{search}%', f'%{search}%'])
+        listings = query_db(
+            '''
+            SELECT *,
+                (SELECT MAX(Bid_Price) FROM Bids b
+                 WHERE b.Seller_Email = Auction_Listings.Seller_Email
+                   AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
+            FROM Auction_Listings
+            WHERE Status = 1
+              AND (Auction_Title LIKE ? OR Product_Name LIKE ?)
+            ''',
+            [f'%{search}%', f'%{search}%'],
+        )
+        return render_template(
+            'listings/browse.html',
+            mode='search', search=search, listings=listings,
+        )
 
-    if category_search:
-        query += (' AND Category = ?')
-        args.append(category_search)
+    # Hierarchy mode: dynamically fetch subcategories of the current node
+    parent_key = category if category else ROOT_PARENT
+    subcategories = query_db(
+        'SELECT category_name FROM Categories WHERE parent_category = ? ORDER BY category_name',
+        [parent_key],
+    )
 
-    listings = query_db(query, tuple(args))
+    listings = []
+    if category:
+        listings = query_db(
+            '''
+            SELECT *,
+                (SELECT MAX(Bid_Price) FROM Bids b
+                 WHERE b.Seller_Email = Auction_Listings.Seller_Email
+                   AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
+            FROM Auction_Listings
+            WHERE Status = 1 AND Category = ?
+            ''',
+            [category],
+        )
 
-    return render_template('listings/browse.html', listings=listings, categories=categories)
+    # Walk parents to build breadcrumb (root → current)
+    path = []
+    cur = category
+    while cur:
+        path.insert(0, cur)
+        parent = query_db(
+            'SELECT parent_category FROM Categories WHERE category_name = ?',
+            [cur], one=True,
+        )
+        cur = parent['parent_category'] if parent and parent['parent_category'] != ROOT_PARENT else None
+
+    return render_template(
+        'listings/browse.html',
+        mode='hierarchy',
+        subcategories=subcategories,
+        listings=listings,
+        category_path=path,
+        current_category=category,
+    )
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>')
 def detail(seller_email, listing_id):
