@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS Categories (
     parent_category TEXT,
     PRIMARY KEY (category_name)
 );
-
+-- add condition
 CREATE TABLE IF NOT EXISTS Auction_Listings (
     Seller_Email TEXT NOT NULL,
     Listing_ID INTEGER NOT NULL,
@@ -145,7 +145,6 @@ CREATE TABLE IF NOT EXISTS Questions (
     Seller_Email TEXT NOT NULL,
     Listing_ID INTEGER NOT NULL,
     Bidder_Email TEXT NOT NULL,
-    question_title TEXT NOT NULL,
     question_text TEXT NOT NULL,
     answer_text TEXT,
     answered INTEGER DEFAULT 0, -- whether the question has been answered or not

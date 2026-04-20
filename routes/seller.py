@@ -46,10 +46,27 @@ def dashboard():
         })
 
     #also want to retrieve sold listings for the specific seller, along with transaction status
-    sold_listings = query_db("""SELECT l.Auction_Title, l.Product_Name, t.Buyer_Email, t.Payment, t.Date
-                                FROM Auction_Listings l, Transactions t
-                                WHERE l.Seller_Email = t.Seller_Email AND l.Listing_ID = t.Listing_ID AND l.Seller_Email = ? AND l.Status = 2""", [email])
-
+    # since transactions aren't in the db unless a transaction is made after selling listing, it must be separated
+    sold_listings = query_db("""SELECT l.Listing_ID, l.Auction_Title, l.Product_Name, l.Category
+                                FROM Auction_Listings l
+                                WHERE l.Seller_Email = ? AND l.Status = 2""", [email])
+    #try and query for the transaction data per sold listing
+    sold_listings_details = []
+    for listing in sold_listings:
+        transaction_detail = query_db("""SELECT Buyer_Email, Payment, Date
+                                        FROM Transactions
+                                      WHERE Seller_Email = ? AND Listing_ID = ?""", [email, listing['Listing_ID']], one=True) # we return this as one row
+        #append the objects to sold listing details if they exist for the listing
+        sold_listings_details.append({
+            'Listing_ID': listing['Listing_ID'],
+            'Auction_Title': listing['Auction_Title'],                                                        
+            'Product_Name': listing['Product_Name'],
+            'Category': listing['Category'],
+            # add the transaction details if found, otherwise return None for Jinja
+            'Buyer_Email': transaction_detail['Buyer_Email'] if transaction_detail else None, 
+            'Payment': transaction_detail['Payment'] if transaction_detail else None,
+            'Date': transaction_detail['Date'] if transaction_detail else None
+        })
     # give the # of unanswered questions
     q_count = query_db('''SELECT COUNT (*) as q_count
                        FROM Questions
@@ -60,7 +77,7 @@ def dashboard():
                              WHERE Seller_Email = ?''', [email], one=True)
     
         
-    return render_template('seller/dashboard.html', bal=bal, active_listings=active_listing_details, sold_listings=sold_listings,
+    return render_template('seller/dashboard.html', bal=bal, active_listings=active_listing_details, sold_listings=sold_listings_details,
                            q_count=q_count, seller_rating=seller_rating)
 
 @seller_bp.route('/list_product', methods=['GET', 'POST'])
