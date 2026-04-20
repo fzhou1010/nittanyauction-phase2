@@ -182,6 +182,10 @@ def _handle_change_id(db, req):
     if taken:
         return f'Email "{new_email}" is already in use.'
 
+    # Defer FK checks until COMMIT so we can rewrite Users.email and every
+    # referencing row in one atomic batch. Without this, the Users update
+    # fails immediately on any child row (Bidders, Sellers, Helpdesk, ...).
+    db.execute('PRAGMA defer_foreign_keys = ON')
     db.execute('UPDATE Users SET email = ? WHERE email = ?', [new_email, old_email])
 
     for table, col in [
@@ -190,6 +194,7 @@ def _handle_change_id(db, req):
         ('Helpdesk', 'email'),
         ('Credit_Cards', 'Owner_email'),
         ('Bids', 'Bidder_Email'),
+        ('Bids', 'Seller_Email'),
         ('Auction_Listings', 'Seller_Email'),
         ('Transactions', 'Seller_Email'),
         ('Transactions', 'Buyer_Email'),
@@ -199,8 +204,12 @@ def _handle_change_id(db, req):
         ('Questions', 'Seller_Email'),
         ('Watchlist', 'Bidder_Email'),
         ('Shopping_Cart', 'Bidder_Email'),
-        ('Local_Vendors', 'Email'),
+        ('Shopping_Cart', 'Seller_Email'),
+        ('Local_Vendors', 'email'),
+        ('Notifications', 'recipient_email'),
+        ('Notifications', 'seller_email'),
         ('Requests', 'sender_email'),
+        ('Requests', 'helpdesk_staff_email'),
     ]:
         db.execute(
             f'UPDATE {table} SET {col} = ? WHERE {col} = ?',
