@@ -17,6 +17,12 @@
             so sale proceeds can be deposited into your account.
         </p>
 
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, msg in messages %}
+            <div class="alert alert-{{ category }} mt-3">{{ msg }}</div>
+            {% endfor %}
+        {% endwith %}
+
         {% if already_seller %}
         <div class="alert alert-success mt-3">
             <strong>You're already a seller.</strong>
@@ -31,12 +37,6 @@
         </div>
 
         {% else %}
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% for category, msg in messages %}
-            <div class="alert alert-{{ category }} mt-3">{{ msg }}</div>
-            {% endfor %}
-        {% endwith %}
-
         <form method="post" class="mt-3">
             <h5 class="mt-4 mb-3">Banking Information</h5>
             <div class="row">

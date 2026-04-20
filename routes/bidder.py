@@ -217,7 +217,7 @@ def apply_seller():
     # landing here is most likely a session/role mismatch, not a valid path.
     if not query_db('SELECT 1 FROM Bidders WHERE email = ?', [email], one=True):
         flash('Only bidders may apply to become sellers.')
-        return redirect(url_for('auth.login'))
+        return redirect(url_for('listings.browse'))
 
     already_seller = query_db(
         'SELECT 1 FROM Sellers WHERE email = ?', [email], one=True,
@@ -247,7 +247,7 @@ def apply_seller():
             flash('Bank routing and account numbers are required.', 'danger')
             return render_template(
                 'bidder/apply_seller.html',
-                already_seller=False, pending=None,
+                already_seller=already_seller, pending=pending,
                 form={'bank_routing_num': routing, 'bank_account_num': account, 'note': note},
             )
 

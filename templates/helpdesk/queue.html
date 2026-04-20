@@ -77,10 +77,10 @@
                 {% if r['request_type'] == 'BecomeSeller' %}
                 <dl class="row small mt-2 mb-3">
                     <dt class="col-sm-3">Routing Number</dt>
-                    <dd class="col-sm-9"><code>{{ r['parsed']['ROUTING'] or '—' }}</code></dd>
+                    <dd class="col-sm-9"><code>{{ r['parsed'].get('ROUTING', '—') }}</code></dd>
                     <dt class="col-sm-3">Account Number</dt>
-                    <dd class="col-sm-9"><code>{{ r['parsed']['ACCOUNT'] or '—' }}</code></dd>
-                    {% if r['parsed']['NOTE'] %}
+                    <dd class="col-sm-9"><code>{{ r['parsed'].get('ACCOUNT', '—') }}</code></dd>
+                    {% if r['parsed'].get('NOTE') %}
                     <dt class="col-sm-3">Applicant Note</dt>
                     <dd class="col-sm-9">{{ r['parsed']['NOTE'] }}</dd>
                     {% endif %}
