@@ -182,7 +182,7 @@ def detail(seller_email, listing_id):
         'listings/detail.html',
         listing=listing, bids=bids, category_path=category_path,
         questions=questions, winner_email=winner_email, has_paid=has_paid,
-        remaining_bids=remaining_bids, in_cart=in_cart
+        remaining_bids=remaining_bids, in_cart=in_cart,
     )
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>/bid', methods=['POST'])
@@ -222,7 +222,17 @@ def place_bid(seller_email, listing_id):
     if auction['Max_bids'] and current_bids['total'] >= auction['Max_bids']:
         flash('This listing has reached the maximum number of bids and is now closed.', 'danger')
         return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
-    
+
+    # Turn-taking rule: same bidder cannot place consecutive bids on the same listing
+    last_bidder = query_db(
+        'SELECT Bidder_Email FROM Bids WHERE Seller_Email = ? AND Listing_ID = ? '
+        'ORDER BY Bid_ID DESC LIMIT 1',
+        [seller_email, listing_id], one=True,
+    )
+    if last_bidder and last_bidder['Bidder_Email'] == user_email:
+        flash('You cannot place consecutive bids — wait for another bidder first.', 'danger')
+        return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
+
     # if there are no bids yet, the minimum required bid is the reserve price (or 0 if no reserve). Otherwise, it must be at least $1 higher than the current highest bid.
     if current_bids['highest_bid'] is None:
         min_required = auction['Reserve_Price'] or 0.0
@@ -239,22 +249,19 @@ def place_bid(seller_email, listing_id):
         INSERT INTO Bids (Seller_Email, Listing_ID, Bidder_Email, Bid_Price)
         VALUES (?, ?, ?, ?)
     ''', (seller_email, listing_id, user_email, bid_amount))
-
     db.commit()
 
+    # Auction may have just reached Max_bids — resolve to Sold (reserve met) or Failed.
     outcome = check_auction_complete(seller_email, listing_id)
-
-    if outcome:
-        if outcome['status'] == 'sold':
-            flash(f"Auction closed! Winner: {outcome['winner']} with a bid of ${outcome['amount']:.2f}.", 'success')
+    if outcome and outcome['status'] == 'sold':
+        if outcome['winner'] == user_email:
+            flash('You won the auction! Complete payment to finalize.', 'success')
         else:
-            flash("Auction closed: Reserve price was not met.", 'info')
+            flash('Your bid was placed, but another bidder won the auction.', 'info')
+    elif outcome and outcome['status'] == 'failed':
+        flash('Auction ended — reserve price was not met.', 'warning')
     else:
         flash('Your bid has been placed.', 'success')
-
-    flash('Your bid has been placed.', 'success')
-    
-    # TODO: bid validation + insertion, max_bids auto-close
     return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>/question', methods=['POST'])
