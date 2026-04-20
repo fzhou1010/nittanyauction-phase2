@@ -60,12 +60,20 @@ def queue():
         [UNASSIGNED_EMAIL],
     )
 
-    my_requests = query_db(
+    my_requests_rows = query_db(
         'SELECT * FROM Requests '
         'WHERE helpdesk_staff_email = ? AND request_status = 0 '
         'ORDER BY request_id',
         [staff_email],
     )
+
+    # Pre-parse the pipe-separated request_desc payload so the template can
+    # render a clean field-by-field view instead of raw text.
+    my_requests = []
+    for row in my_requests_rows:
+        entry = dict(row)
+        entry['parsed'] = _parse_request_desc(row['request_desc'])
+        my_requests.append(entry)
 
     completed = query_db(
         'SELECT * FROM Requests '

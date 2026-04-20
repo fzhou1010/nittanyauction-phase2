@@ -74,7 +74,20 @@
                         <span class="text-muted ms-2">from {{ r['sender_email'] }}</span>
                     </div>
                 </div>
+                {% if r['request_type'] == 'BecomeSeller' %}
+                <dl class="row small mt-2 mb-3">
+                    <dt class="col-sm-3">Routing Number</dt>
+                    <dd class="col-sm-9"><code>{{ r['parsed']['ROUTING'] or '—' }}</code></dd>
+                    <dt class="col-sm-3">Account Number</dt>
+                    <dd class="col-sm-9"><code>{{ r['parsed']['ACCOUNT'] or '—' }}</code></dd>
+                    {% if r['parsed']['NOTE'] %}
+                    <dt class="col-sm-3">Applicant Note</dt>
+                    <dd class="col-sm-9">{{ r['parsed']['NOTE'] }}</dd>
+                    {% endif %}
+                </dl>
+                {% else %}
                 <p class="mt-2 mb-3">{{ r['request_desc'] or '—' }}</p>
+                {% endif %}
 
                 <form method="post" action="{{ url_for('helpdesk.handle_request', rid=r['request_id']) }}">
                     {% if r['request_type'] == 'AddCategory' %}
