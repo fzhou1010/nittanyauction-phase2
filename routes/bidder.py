@@ -177,6 +177,32 @@ def auction_history():
 
     return render_template('bidder/auction_history.html', won=won, bids=bid_rows)
 
+@bidder_bp.route('/notifications')
+def notifications():
+    rows = query_db(
+        'SELECT notification_id, notif_type, message, seller_email, listing_id, is_read, created_at '
+        'FROM Notifications WHERE recipient_email = ? ORDER BY created_at DESC',
+        [session['email']],
+    )
+    return render_template('bidder/notifications.html', notifications=rows)
+
+@bidder_bp.route('/notifications/mark_read', methods=['POST'])
+def notifications_mark_read():
+    notification_id = request.form.get('notification_id', '').strip()
+    db = get_db()
+    if notification_id:
+        db.execute(
+            'UPDATE Notifications SET is_read = 1 WHERE notification_id = ? AND recipient_email = ?',
+            [notification_id, session['email']],
+        )
+    else:
+        db.execute(
+            'UPDATE Notifications SET is_read = 1 WHERE recipient_email = ? AND is_read = 0',
+            [session['email']],
+        )
+    db.commit()
+    return redirect(request.form.get('next') or url_for('bidder.notifications'))
+
 @bidder_bp.route('/rate/<seller_email>', methods=['GET', 'POST'])
 def rate_seller(seller_email):
     # TODO: rating form + insert
