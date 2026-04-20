@@ -1,5 +1,65 @@
 {% extends "base.html" %}
+{% block title %}Auction History - NittanyAuction{% endblock %}
+
 {% block content %}
-<h3>bidder / auction_history</h3>
-<p class="text-muted">TODO</p>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Auction History</h2>
+    <a href="{{ url_for('listings.browse') }}" class="btn btn-outline-primary btn-sm">Browse Listings</a>
+</div>
+
+{% with messages = get_flashed_messages() %}
+    {% if messages %}
+        {% for m in messages %}
+            <div class="alert alert-info py-2">{{ m }}</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<h5 class="text-muted mb-3">Won Auctions <span class="text-muted">({{ won|length }})</span></h5>
+
+{% if not won %}
+    <div class="alert alert-light text-center py-4">You haven't won any auctions yet.</div>
+{% else %}
+    <div class="table-responsive mb-4">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Listing</th>
+                    <th>Seller</th>
+                    <th>Winning Bid</th>
+                    <th>Sold On</th>
+                    <th>Payment</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for w in won %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('listings.detail', seller_email=w.Seller_Email, listing_id=w.Listing_ID) }}">
+                            {{ w.Auction_Title }}
+                        </a>
+                        <div class="small text-muted">{{ w.Category }}</div>
+                    </td>
+                    <td class="small">{{ w.Seller_Email }}</td>
+                    <td>${{ '%.2f' % w.winning_bid }}</td>
+                    <td>
+                        {% if w.sold_date %}
+                            {{ w.sold_date }}
+                        {% else %}
+                            <span class="text-muted">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if w.Payment %}
+                            <span class="badge bg-success">Paid</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark">Unpaid</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}
 {% endblock %}

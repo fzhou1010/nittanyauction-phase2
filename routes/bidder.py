@@ -111,8 +111,37 @@ def cart_remove():
 
 @bidder_bp.route('/auction_history')
 def auction_history():
-    # TODO: won auctions + bid history
-    return render_template('bidder/auction_history.html')
+    email = session['email']
+
+    # Won auctions: closed listings where this bidder had the highest bid and it met reserve.
+    won = query_db(
+        '''
+        SELECT
+            al.Seller_Email, al.Listing_ID, al.Auction_Title, al.Product_Name,
+            al.Category, al.Reserve_Price, al.Status,
+            (SELECT MAX(Bid_Price) FROM Bids b
+                WHERE b.Seller_Email = al.Seller_Email AND b.Listing_ID = al.Listing_ID) AS winning_bid,
+            t.Date AS sold_date, t.Payment
+        FROM Auction_Listings al
+        LEFT JOIN Transactions t
+            ON t.Seller_Email = al.Seller_Email
+           AND t.Listing_ID  = al.Listing_ID
+           AND t.Buyer_Email = ?
+        WHERE al.Status != 1
+          AND ? = (
+              SELECT Bidder_Email FROM Bids b
+              WHERE b.Seller_Email = al.Seller_Email AND b.Listing_ID = al.Listing_ID
+              ORDER BY Bid_Price DESC LIMIT 1
+          )
+          AND (SELECT MAX(Bid_Price) FROM Bids b
+               WHERE b.Seller_Email = al.Seller_Email AND b.Listing_ID = al.Listing_ID)
+              >= COALESCE(al.Reserve_Price, 0)
+        ORDER BY COALESCE(t.Date, '') DESC, al.Listing_ID DESC
+        ''',
+        [email, email],
+    )
+
+    return render_template('bidder/auction_history.html', won=won)
 
 @bidder_bp.route('/rate/<seller_email>', methods=['GET', 'POST'])
 def rate_seller(seller_email):
