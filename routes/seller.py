@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from db import get_db, query_db
+from notifications import notify
 
 seller_bp = Blueprint('seller', __name__)
 
@@ -157,6 +158,7 @@ def list_product_review():
 
         db = get_db()
         #fix: need to add the condition of the product
+        reserve = float(listing['reserve_price'])
         db.execute('''
             INSERT INTO Auction_Listings
                 (Seller_Email, Listing_ID, Category, Auction_Title, Product_Name,
@@ -164,7 +166,19 @@ def list_product_review():
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         ''', [email, next_id, listing['category'], listing['auction_title'], listing['product_name'],
               listing['product_description'], int(listing['quantity']),
-              float(listing['reserve_price']), int(listing['max_bids'])])
+              reserve, int(listing['max_bids'])])
+
+        # Notify every bidder whose watchlist matches this new listing (distinct by bidder).
+        matchers = query_db(
+            'SELECT DISTINCT Bidder_Email FROM Watchlist '
+            'WHERE category = ? AND max_price >= ? AND Bidder_Email != ?',
+            [listing['category'], reserve, email],
+        )
+        title = listing['auction_title'] or listing['product_name'] or 'New listing'
+        for row in matchers:
+            notify(row['Bidder_Email'], 'watchlist_match',
+                   f'New listing matches your watchlist: "{title}" (${reserve:.2f}).',
+                   email, next_id)
         db.commit()
 
         # after saving all of the data to the database, we can get rid of the listing from the current sessions
