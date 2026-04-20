@@ -136,7 +136,7 @@ def detail(seller_email, listing_id):
         'listings/detail.html',
         listing=listing, bids=bids, category_path=category_path,
         questions=questions, winner_email=winner_email, has_paid=has_paid,
-        remaining_bids=remaining_bids, in_cart=in_cart,
+        remaining_bids=remaining_bids, in_cart=in_cart
     )
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>/bid', methods=['POST'])
@@ -194,15 +194,17 @@ def place_bid(seller_email, listing_id):
         VALUES (?, ?, ?, ?)
     ''', (seller_email, listing_id, user_email, bid_amount))
 
-    #if the bid reaches max_bids, close the auction
-    if auction['Max_bids'] and current_bids['total'] + 1 >= auction['Max_bids']:
-        db.execute('''
-            UPDATE Auction_Listings
-            SET Status = 0
-            WHERE Seller_Email = ? AND Listing_ID = ?
-        ''', (seller_email, listing_id))
-    
     db.commit()
+
+    outcome = check_auction_complete(seller_email, listing_id)
+
+    if outcome:
+        if outcome['status'] == 'sold':
+            flash(f"Auction closed! Winner: {outcome['winner']} with a bid of ${outcome['amount']:.2f}.", 'success')
+        else:
+            flash("Auction closed: Reserve price was not met.", 'info')
+    else:
+        flash('Your bid has been placed.', 'success')
 
     flash('Your bid has been placed.', 'success')
     
