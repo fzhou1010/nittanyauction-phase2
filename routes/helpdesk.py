@@ -1,9 +1,23 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from db import get_db, query_db
+from notifications import notify
 
 helpdesk_bp = Blueprint('helpdesk', __name__)
 
 UNASSIGNED_EMAIL = 'helpdeskteam@lsu.edu'
+
+
+def _parse_request_desc(desc):
+    """Parse a 'KEY: value | KEY: value' request_desc into a dict.
+
+    Keys are upper-cased and trimmed; unknown keys are preserved so handlers
+    can add fields without the parser caring."""
+    out = {}
+    for chunk in (desc or '').split('|'):
+        if ':' in chunk:
+            k, v = chunk.split(':', 1)
+            out[k.strip().upper()] = v.strip()
+    return out
 
 
 @helpdesk_bp.before_request
@@ -223,10 +237,38 @@ def _handle_market_analysis(db, req):
     return None
 
 
+def _handle_become_seller(db, req):
+    sender = req['sender_email']
+    parts = _parse_request_desc(req['request_desc'])
+    routing = parts.get('ROUTING')
+    account = parts.get('ACCOUNT')
+
+    if not routing or not account:
+        return 'Banking details missing from this application.'
+
+    if not query_db('SELECT 1 FROM Bidders WHERE email = ?', [sender], one=True):
+        return 'Applicant is no longer a registered bidder.'
+
+    if query_db('SELECT 1 FROM Sellers WHERE email = ?', [sender], one=True):
+        return 'Applicant is already a seller.'
+
+    db.execute(
+        'INSERT INTO Sellers (email, bank_routing_number, bank_account_number) '
+        'VALUES (?, ?, ?)',
+        [sender, routing, account],
+    )
+    notify(
+        sender, 'seller_approved',
+        'Your seller application has been approved. You can now list items for auction.',
+    )
+    return None
+
+
 _REQUEST_HANDLERS = {
     'AddCategory': _handle_add_category,
     'ChangeID': _handle_change_id,
     'MarketAnalysis': _handle_market_analysis,
+    'BecomeSeller': _handle_become_seller,
 }
 
 
