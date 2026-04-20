@@ -58,6 +58,7 @@ def shopping_cart():
             'remaining_bids': max(r['Max_bids'] - bid_count, 0) if r['Max_bids'] else 0,
             'status': r['Status'],
             'status_label': STATUS_LABELS.get(r['Status'], 'Unknown'),
+            'reserve_price': r['Reserve_Price'],
         })
 
     return render_template('bidder/shopping_cart.html', items=items)
