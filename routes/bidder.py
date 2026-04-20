@@ -4,6 +4,7 @@ from db import get_db, query_db
 bidder_bp = Blueprint('bidder', __name__)
 
 STATUS_LABELS = {1: 'Active', 0: 'Inactive', 2: 'Sold'}
+UNASSIGNED_HELPDESK = 'helpdeskteam@lsu.edu'
 
 @bidder_bp.before_request
 def require_login():
@@ -210,5 +211,65 @@ def rate_seller(seller_email):
 
 @bidder_bp.route('/apply_seller', methods=['GET', 'POST'])
 def apply_seller():
-    # TODO: seller application form -> Requests table
-    return render_template('bidder/apply_seller.html')
+    email = session['email']
+
+    # Defensive: this route is for bidders upgrading to sellers. A non-bidder
+    # landing here is most likely a session/role mismatch, not a valid path.
+    if not query_db('SELECT 1 FROM Bidders WHERE email = ?', [email], one=True):
+        flash('Only bidders may apply to become sellers.')
+        return redirect(url_for('auth.login'))
+
+    already_seller = query_db(
+        'SELECT 1 FROM Sellers WHERE email = ?', [email], one=True,
+    ) is not None
+
+    pending = query_db(
+        "SELECT request_id FROM Requests "
+        "WHERE sender_email = ? AND request_type = 'BecomeSeller' "
+        "  AND request_status = 0 "
+        "ORDER BY request_id DESC LIMIT 1",
+        [email], one=True,
+    )
+
+    if request.method == 'POST':
+        if already_seller:
+            flash('You are already a seller.', 'warning')
+            return redirect(url_for('bidder.apply_seller'))
+        if pending:
+            flash('You already have a pending seller application.', 'warning')
+            return redirect(url_for('bidder.apply_seller'))
+
+        routing = request.form.get('bank_routing_num', '').strip()
+        account = request.form.get('bank_account_num', '').strip()
+        note = request.form.get('note', '').strip()
+
+        if not routing or not account:
+            flash('Bank routing and account numbers are required.', 'danger')
+            return render_template(
+                'bidder/apply_seller.html',
+                already_seller=False, pending=None,
+                form={'bank_routing_num': routing, 'bank_account_num': account, 'note': note},
+            )
+
+        # request_desc encodes the application payload in the same pipe-separated
+        # "KEY: value" shape used by auth.support for ChangeID requests, so the
+        # helpdesk handler parses all request types uniformly.
+        desc = f'ROUTING: {routing} | ACCOUNT: {account} | NOTE: {note}'
+
+        db = get_db()
+        db.execute(
+            'INSERT INTO Requests (sender_email, helpdesk_staff_email, '
+            '                      request_type, request_desc, request_status) '
+            'VALUES (?, ?, ?, ?, ?)',
+            [email, UNASSIGNED_HELPDESK, 'BecomeSeller', desc, 0],
+        )
+        db.commit()
+        flash('Your seller application has been submitted for review.', 'success')
+        return redirect(url_for('bidder.apply_seller'))
+
+    return render_template(
+        'bidder/apply_seller.html',
+        already_seller=already_seller,
+        pending=pending,
+        form={},
+    )
