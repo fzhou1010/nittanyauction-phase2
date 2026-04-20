@@ -45,7 +45,7 @@ def login():
             if 'helpdesk' in roles:
                 return redirect(url_for('helpdesk.welcome'))
             elif 'seller' in roles:
-                return redirect(url_for('seller.welcome'))
+                return redirect(url_for('seller.dashboard'))
             else:
                 return redirect(url_for('bidder.welcome'))
 

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}List a Product - Review{% endblock %}
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8">
+        <!-- Progress bar -->
+        <div class="d-flex justify-content-between mb-2">
+            <small><strong>Step 4 of 4</strong></small>
+        </div>
+        <div class="progress mb-4" style="height: 8px;">
+            <div class="progress-bar" style="width: 100%"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title mb-3">Review your listing</h3>
+                <p class="text-muted">Please ensure that the details are correct for your listing. Go back to edit if anything looks incorrect </p>
+
+                <table class="table">
+                    <!-- We can display all of the appropriate data from the listing for the user to double check -->
+                    <tbody>
+                        <tr>
+                            <th style="width: 30%">Category</th>
+                            <td><span class="badge bg-secondary">{{ listing['category'] }}</span></td>
+                        </tr>
+                        <tr>
+                            <th>Listing Name</th>
+                            <td>{{ listing['auction_title'] }}</td>
+                        </tr>
+                        <tr>
+                            <th>Product Name</th>
+                            <td>{{ listing['product_name'] }}</td>
+                        </tr>
+                        <tr>
+                            <th>Description</th>
+                            <td>{{ listing['product_description'] or '(none)' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Quantity</th>
+                            <td>{{ listing['quantity'] }}</td>
+                        </tr>
+                        <tr>
+                            <th>Condition</th>
+                            <td>${{ listing['condition'] }}</td>
+                        </tr>
+                        <tr>
+                            <th>Reserve Price</th>
+                            <td>${{ "%.2f"|format(listing['reserve_price']|float) }}</td>
+                        </tr>
+                        <tr>
+                            <th>Max Bids</th>
+                            <td>{{ listing['max_bids'] }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <form method="POST">
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{{ url_for('seller.list_product_pricing') }}" class="btn btn-outline-secondary">Back</a>
+                        <button type="submit" class="btn btn-success">Publish Listing</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

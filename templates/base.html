@@ -13,9 +13,11 @@
         <a class="navbar-brand" href="/">NittanyAuction</a>
         {% if session.get('email') %}
         <div class="navbar-nav ms-auto">
-            <a class = "nav-link" href = "{{ url_for('auth.profile')}}">
-                <strong>{{ session['email'] }}</strong>
-            </a>
+            <!-- local vendors shouldnt be able to browse -->
+            {% if 'bidder' in session.get('roles', []) %} <!-- this is because student sellers are also bidders by default -->
+            <a class="nav-link" href="{{ url_for('listings.browse') }}">Browse</a>
+            {% endif %}
+            <a class="nav-link" href="{{ url_for('auth.profile') }}">{{ session['email'] }}</a>
             <a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a>
         </div>
         {% endif %}
