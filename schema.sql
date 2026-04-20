@@ -160,8 +160,8 @@ CREATE TABLE IF NOT EXISTS Watchlist (
     Bidder_Email TEXT NOT NULL,
     category TEXT NOT NULL,
     max_price REAL NOT NULL CHECK(max_price > 0), --maximum price the user wants to keep track of the product until
-    condition TEXT CHECK(condition IN ('New', 'Lightly Used', 'Used') OR condition IS NULL), --condition of the product that you want it in
-    PRIMARY KEY (watchlist_id),
+    condition TEXT CHECK(condition IN ('New', 'Lightly Used', 'Used') OR condition IS NULL), --condition of the
+    PRIMARY KEY (watchlist_id), --product that you want it in
     UNIQUE(Bidder_Email, category, max_price, condition),
     FOREIGN KEY (Bidder_Email) REFERENCES Bidders(email) ON DELETE CASCADE,
     FOREIGN KEY (category) REFERENCES Categories(category_name)

@@ -30,21 +30,55 @@
     </div>
     
     <!-- Bid section -->
-    <div class="col-lg-4"> 
+    <div class="col-lg-4">
         <div class="card mb-3">
             <div class="card-body">
-                <h2>Current Highest Bid</h2>
-                {% if bids %}
-                <p class="h4">${{ bids[0].Bid_Price }}</p>
+                {% if listing.Status == 2 %}
+                    {# ── Auction sold ── #}
+                    <div class="alert alert-success mb-3">
+                        <h5 class="alert-heading">Auction Ended &mdash; Sold</h5>
+                        {% if winner_email == session.get('email') and not has_paid %}
+                            <p>You won this auction for <strong>${{ bids[0].Bid_Price }}</strong>.</p>
+                            <a href="{{ url_for('listings.pay', seller_email=listing.Seller_Email, listing_id=listing.Listing_ID) }}"
+                               class="btn btn-success">Proceed to Payment</a>
+                        {% elif winner_email == session.get('email') and has_paid %}
+                            <p>You won and paid <strong>${{ bids[0].Bid_Price }}</strong>. Transaction complete.</p>
+                        {% else %}
+                            <p>This auction has been sold to another bidder.</p>
+                        {% endif %}
+                    </div>
+
+                {% elif listing.Status == 0 %}
+                    {# ── Auction failed / removed ── #}
+                    <div class="alert alert-secondary mb-3">
+                        <h5 class="alert-heading">Auction Ended</h5>
+                        <p>This auction has ended &mdash; the reserve price was not met.</p>
+                    </div>
+
                 {% else %}
-                <p class="h4">${{ listing.Reserve_Price or '0.00' }}</p>
+                    {# ── Active auction ── #}
+                    <h5>Current Highest Bid</h5>
+                    {% if bids %}
+                    <p class="h4">${{ bids[0].Bid_Price }}</p>
+                    {% else %}
+                    <p class="h4">No bids yet</p>
+                    {% endif %}
+                    <p class="text-muted">{{ remaining_bids }} bid{{ 's' if remaining_bids != 1 }} remaining</p>
+
+                    {% if session.get('email') != listing.Seller_Email %}
+                    <form action="{{ url_for('listings.place_bid', seller_email=listing.Seller_Email, listing_id=listing.Listing_ID) }}" method="post">
+                        <div class="input-group mb-2">
+                            <span class="input-group-text">$</span>
+                            <input type="number" name="bid_amount" class="form-control" step="1"
+                                   min="{{ (bids[0].Bid_Price|int + 1) if bids else 1 }}" required
+                                   placeholder="Min ${{ (bids[0].Bid_Price|int + 1) if bids else 1 }}">
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Place Bid</button>
+                    </form>
+                    {% else %}
+                    <p class="text-muted fst-italic">You cannot bid on your own listing.</p>
+                    {% endif %}
                 {% endif %}
-                
-                <!-- Bid Form (if active) -->
-                <form action="{{ url_for('listings.place_bid', seller_email=listing.Seller_Email, listing_id=listing.Listing_ID) }}" method="post">
-                    <input type="number" name="bid_amount" step="0.01" min="{{ (bids[0].Bid_Price if bids else listing.Reserve_Price or 0) + 0.01 }}" required>
-                    <button type="submit" class="btn btn-primary">Place Bid</button>
-                </form>
             </div>
         </div>
     </div>
@@ -84,14 +118,23 @@
         <div class="card mb-3">
             <div class="card-body">
                 <h2>Questions</h2>
-                {% if questions %}
-                {% for q in questions %}
-                <p><strong>Q:</strong> {{ q.question }}</p>
-                <p><strong>A:</strong> {{ q.answer or 'Pending' }}</p>
-                {% endfor %}
-                {% else %}
-                <p>No questions yet.</p>
-                {% endif %}
+                    {% if questions %}
+                        {% for q in questions %}
+                            <div class="mb-3">
+                                <p>
+                                    <strong>Q:</strong> {{ q.question_text }} 
+                                    <small class="text-muted">- {{ q.question_time }}</small>
+                                </p>
+                                
+                                <!-- Only show the A: line if answer_text is not null/empt-->
+                                {% if q.answer_text %}
+                                    <p><strong>A:</strong> {{ q.answer_text }}</p>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p>No questions yet.</p>
+                    {% endif %}
                 
                 <form action="{{ url_for('listings.ask_question', seller_email=listing.Seller_Email, listing_id=listing.Listing_ID) }}" method="post">
                     <textarea name="question" placeholder="Ask a question" required></textarea>
