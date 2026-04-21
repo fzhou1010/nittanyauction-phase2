@@ -118,6 +118,7 @@ def register_form(role):
             last_name = request.form['last_name']
             age = request.form.get('age') # we can use .get from the forms as these fields are not mandatory to the user signing up to use the page
             major = request.form.get('major')
+            phone = request.form['phone']
             street_num = request.form['street_num']
             street_name = request.form['street_name']
             zipcode = request.form['zipcode']
@@ -131,8 +132,8 @@ def register_form(role):
                 db.execute('INSERT OR IGNORE INTO Zipcode_Info (zipcode, city, state) VALUES (?, ?, ?)', [zipcode, city, state])
                 db.execute('INSERT INTO Address (address_id, zipcode, street_num, street_name) VALUES (?, ?, ?, ?)',
                             [address_id, zipcode, street_num, street_name])
-                db.execute('INSERT INTO Bidders (email, first_name, last_name, age, home_address_id, major) VALUES (?, ?, ?, ?, ?, ?)', 
-                           [email, first_name, last_name, age, address_id, major])
+                db.execute('INSERT INTO Bidders (email, first_name, last_name, age, home_address_id, major, phone) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                           [email, first_name, last_name, age, address_id, major, phone])
                 db.commit()
                 session['email'] = email
                 session['roles'] = get_user_roles(email)
@@ -149,6 +150,7 @@ def register_form(role):
             last_name = request.form['last_name']
             age = request.form.get('age') # we can use .get from the forms as these fields are not mandatory to the user signing up to use the page
             major = request.form.get('major')
+            phone = request.form['phone']
             street_num = request.form['street_num']
             street_name = request.form['street_name']
             zipcode = request.form['zipcode']
@@ -163,8 +165,8 @@ def register_form(role):
                 db.execute('INSERT OR IGNORE INTO Zipcode_Info (zipcode, city, state) VALUES (?, ?, ?)', [zipcode, city, state])
                 db.execute('INSERT INTO Address (address_id, zipcode, street_num, street_name) VALUES (?, ?, ?, ?)',
                             [address_id, zipcode, street_num, street_name])
-                db.execute('INSERT INTO Bidders (email, first_name, last_name, age, home_address_id, major) VALUES (?, ?, ?, ?, ?, ?)', 
-                           [email, first_name, last_name, age, address_id, major]) # since student sellers are also bidders by default, they also need to be entered into the bidders relation
+                db.execute('INSERT INTO Bidders (email, first_name, last_name, age, home_address_id, major, phone) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                           [email, first_name, last_name, age, address_id, major, phone]) # since student sellers are also bidders by default, they also need to be entered into the bidders relation
                 db.execute('INSERT INTO Sellers (email, bank_routing_number, bank_account_number) VALUES (?, ?, ?)', 
                            [email, bank_routing_num, bank_account_num]) #we want the balance to be set to default in the schema, therefore we don't include a value here
                 db.commit()
