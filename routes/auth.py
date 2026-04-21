@@ -147,7 +147,7 @@ def register_form(role):
                 db.commit()
                 session['email'] = email
                 session['roles'] = get_user_roles(email)
-                return redirect(url_for('seller.welcome'))
+                return redirect(url_for('seller.dashboard'))
             except sql.IntegrityError:
                 flash('Error saving information into the database.')
                 return render_template('auth/register_form.html', role=role)
@@ -178,12 +178,12 @@ def register_form(role):
                 print('commit successful')
                 session['email'] = email
                 session['roles'] = get_user_roles(email)
-                return redirect(url_for('seller.welcome')) #Todo: Make a local vendor welcome page, or should it be the same as the seller page
-            except Exception as e:                                                                                                    
-                flash(f'Error saving information: {e}')
-                return render_template('auth/register_form.html', role=role)
+                return redirect(url_for('seller.dashboard')) 
             except sql.IntegrityError:
                 flash('Error saving information into the database.')
+                return render_template('auth/register_form.html', role=role)
+            except Exception as e:
+                flash(f'Error saving information: {e}')
                 return render_template('auth/register_form.html', role=role)
             
 

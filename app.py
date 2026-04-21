@@ -46,7 +46,7 @@ def index():
         return redirect(url_for('auth.login'))
     if 'helpdesk' in session['roles']:                                                                                                                       
         return redirect(url_for('helpdesk.welcome'))
-    elif 'seller' in session['roles']:                                                                                                                       
+    elif 'seller' in session['roles']:
         return redirect(url_for('seller.dashboard'))
     else:                                                                                                                                                    
         return redirect(url_for('bidder.welcome'))

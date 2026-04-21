@@ -13,7 +13,7 @@ def require_seller():
 
 @seller_bp.route('/welcome')
 def welcome():
-    return render_template('seller/welcome.html')
+    return render_template('seller/dashboard.html')
 
 @seller_bp.route('/dashboard')
 def dashboard():
@@ -80,6 +80,7 @@ def dashboard():
     return render_template('seller/dashboard.html', bal=bal, active_listings=active_listing_details, sold_listings=sold_listings_details,
                            q_count=q_count, seller_rating=seller_rating)
 
+# Initial Step of Creating a Listing, Selecting a Category
 @seller_bp.route('/list_product', methods=['GET', 'POST'])
 def list_product():
     # render the category selection for listing a product
@@ -96,7 +97,7 @@ def list_product():
 
     return render_template('seller/list_product/category.html', categories=categories)
 
-
+# Details on the Listing
 @seller_bp.route('/list_product/details', methods=['GET', 'POST'])
 def list_product_details(): 
     #for the user to input product listing details
@@ -127,7 +128,7 @@ def list_product_details():
 
     return render_template('seller/list_product/product_details.html', listing=session['cur_listing'])
 
-
+# Update Product Listing Price
 @seller_bp.route('/list_product/pricing', methods=['GET', 'POST'])
 def list_product_pricing(): # for the product reserve price and auction termination parameters
     #check if the listing is in the session
@@ -153,19 +154,18 @@ def list_product_pricing(): # for the product reserve price and auction terminat
 
     return render_template('seller/list_product/pricing.html', listing=session['cur_listing'])
 
-
+# Review the listing before posting in case anything is wrong
 @seller_bp.route('/list_product/review', methods=['GET', 'POST'])
 def list_product_review():
-    # Step 4: Review and submit
+    #if the listing is not in the session or if the previous reserve price was not saved
     if 'cur_listing' not in session or 'reserve_price' not in session['cur_listing']:
         return redirect(url_for('seller.list_product'))
 
     listing = session['cur_listing']
-
     if request.method == 'POST': 
         email = session['email']
 
-        # Get next Listing_ID for this seller (per-seller, not global)
+        #we want to get the maximum auction id for this user, so we can increment it for this upcoming listing
         max_id = query_db(
             'SELECT MAX(Listing_ID) AS max_id FROM Auction_Listings WHERE Seller_Email = ?',
             [email], one=True
@@ -173,15 +173,13 @@ def list_product_review():
         next_id = (max_id['max_id'] or 0) + 1
 
         db = get_db()
-        #fix: need to add the condition of the product
         db.execute('''
             INSERT INTO Auction_Listings
                 (Seller_Email, Listing_ID, Category, Auction_Title, Product_Name,
-                 Product_Description, Quantity, Reserve_Price, Max_bids, Status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                 Product_Description, Condition, Quantity, Reserve_Price, Max_bids, Status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         ''', [email, next_id, listing['category'], listing['auction_title'], listing['product_name'],
-              listing['product_description'], int(listing['quantity']),
-              float(listing['reserve_price']), int(listing['max_bids'])])
+              listing['product_description'], listing['condition'], int(listing['quantity']), float(listing['reserve_price']), int(listing['max_bids'])])
         db.commit()
 
         # after saving all of the data to the database, we can get rid of the listing from the current sessions
@@ -226,12 +224,6 @@ def question(qid):
     
     
     return render_template('seller/question.html', question=question)
-
-                 
-@seller_bp.route('/questions/<int:qid>/answer', methods=['POST'])
-def answer_question(qid):
-    # TODO: update question with answer
-    return redirect(url_for('seller.questions'))
 
 @seller_bp.route('/request_category', methods=['GET', 'POST'])
 def request_category():
