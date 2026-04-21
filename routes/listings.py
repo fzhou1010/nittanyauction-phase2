@@ -243,6 +243,11 @@ def place_bid(seller_email, listing_id):
     
     user_email = session.get('email')
 
+    # BR-3: a seller cannot bid on their own listing.
+    if user_email == seller_email:
+        flash('You cannot bid on your own listing.', 'danger')
+        return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
+
     # Fetch auction details and current bids to validate the new bid
     auction = query_db('''
         SELECT Max_bids, Reserve_Price, Status
