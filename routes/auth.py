@@ -339,12 +339,11 @@ def promote():
     
     unassigned_staff = 'helpdeskteam@lsu.edu'
     
-    request_desc = f"ROUTING:{routing_number} | ACCOUNT:{account_number}"
     db = get_db()
 
     db.execute('''
         INSERT INTO Requests (sender_email, helpdesk_staff_email, request_type, request_desc, request_status)
-        VALUES (?, ?, ?, ?, ?)''', [user_email, unassigned_staff, 'BecomeSeller', request_desc , 0])
+        VALUES (?, ?, ?, ?, ?)''', [user_email, unassigned_staff, 'BecomeSeller', "ROUTING:{routing_number} | ACCOUNT:{account_number}" , 0])
     db.commit()
 
     flash('Your request has been submitted. A HelpDesk staff member will review your request.', 'success')
