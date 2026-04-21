@@ -22,6 +22,7 @@
             <div class="card-body">
                 <h1>{{ listing.Auction_Title }}</h1>
                 <p class="text-muted">By {{ listing.Seller_Email }}</p>
+                <p class="text-muted">Rating: {{ avg_rating.Avg_Rating or 'No rating yet'}}</p>
                 <p>{{ listing.Product_Description or 'No description.' }}</p>
                 <p><strong>Category:</strong> {{ listing.Category }}</p>
                 <p><strong>Product:</strong> {{ listing.Product_Name }}</p>
@@ -158,6 +159,35 @@
                     <textarea name="question" placeholder="Ask a question" required></textarea>
                     <button type="submit" class="btn btn-secondary">Submit</button>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Seller Reviews -->
+
+    <div class="col-12">
+        <div class="card mb-3">
+            <div class="card-body">
+                <h2>Seller Reviews</h2>
+                {% if reviews %}
+                <table class="table">
+                    <thead>
+                        <tr><th>Rating</th><th>Bidder</th><th>Description</th><th>Date</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for review in reviews %}
+                        <tr>
+                            <td>{{ review.Rating }}</td>
+                            <td>{{ review.Bidder_Email }}</td>
+                            <td>{{ review.Rating_Desc }}</td>
+                            <td>{{ review.Date }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p>No reviews yet.</p>
+                {% endif %}
             </div>
         </div>
     </div>
