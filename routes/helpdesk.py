@@ -1,21 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from db import get_db, query_db, HELPDESK_TEAM_EMAIL
+from db import get_db, query_db, parse_request_desc, HELPDESK_TEAM_EMAIL
 from notifications import notify
 
 helpdesk_bp = Blueprint('helpdesk', __name__)
-
-
-def _parse_request_desc(desc):
-    """Parse a 'KEY: value | KEY: value' request_desc into a dict.
-
-    Keys are upper-cased and trimmed; unknown keys are preserved so handlers
-    can add fields without the parser caring."""
-    out = {}
-    for chunk in (desc or '').split('|'):
-        if ':' in chunk:
-            k, v = chunk.split(':', 1)
-            out[k.strip().upper()] = v.strip()
-    return out
 
 
 @helpdesk_bp.before_request
@@ -70,7 +57,7 @@ def queue():
     my_requests = []
     for row in my_requests_rows:
         entry = dict(row)
-        entry['parsed'] = _parse_request_desc(row['request_desc'])
+        entry['parsed'] = parse_request_desc(row['request_desc'])
         my_requests.append(entry)
 
     completed = query_db(
@@ -249,7 +236,7 @@ def _handle_market_analysis(db, req):
 
 def _handle_become_seller(db, req):
     sender = req['sender_email']
-    parts = _parse_request_desc(req['request_desc'])
+    parts = parse_request_desc(req['request_desc'])
     routing = parts.get('ROUTING')
     account = parts.get('ACCOUNT')
 

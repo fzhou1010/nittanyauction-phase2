@@ -1,6 +1,7 @@
 # Database helper functions
 # Provides a shared SQLite connection per request and a convenience query function
 
+import json
 import sqlite3 as sql
 import os
 
@@ -41,3 +42,41 @@ def query_db(query, args=(), one=False):
     cur = db.execute(query, args)
     rv = cur.fetchall()
     return (rv[0] if rv else None) if one else rv
+
+
+def format_request_desc(**fields):
+    """Encode structured request_desc fields as JSON.
+
+    Use keys that match what templates expect (e.g., 'ROUTING', 'ACCOUNT').
+    Values can contain any characters, including '|' and ':'.
+    """
+    return json.dumps(fields)
+
+
+def parse_request_desc(desc):
+    """Parse a Requests.request_desc payload into a dict.
+
+    Handles two formats:
+      1. JSON (new, written via format_request_desc)
+      2. Legacy 'KEY: value | KEY: value' pipe-separated (used by CSV-seeded
+         rows and older app code). Keys are upper-cased for consistency with
+         the old _parse_request_desc behavior.
+
+    Missing/empty input returns an empty dict.
+    """
+    desc = (desc or '').strip()
+    if not desc:
+        return {}
+    if desc.startswith('{'):
+        try:
+            parsed = json.loads(desc)
+            if isinstance(parsed, dict):
+                return parsed
+        except (ValueError, TypeError):
+            pass  # fall through to legacy
+    out = {}
+    for chunk in desc.split('|'):
+        if ':' in chunk:
+            k, v = chunk.split(':', 1)
+            out[k.strip().upper()] = v.strip()
+    return out

@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from db import get_db, query_db, HELPDESK_TEAM_EMAIL
+from db import get_db, query_db, format_request_desc, HELPDESK_TEAM_EMAIL
 
 bidder_bp = Blueprint('bidder', __name__)
 
@@ -250,10 +250,10 @@ def apply_seller():
                 form={'bank_routing_num': routing, 'bank_account_num': account, 'note': note},
             )
 
-        # request_desc encodes the application payload in the same pipe-separated
-        # "KEY: value" shape used by auth.support for ChangeID requests, so the
-        # helpdesk handler parses all request types uniformly.
-        desc = f'ROUTING: {routing} | ACCOUNT: {account} | NOTE: {note}'
+        # request_desc encodes the application payload as JSON so values can
+        # contain '|' or ':' without being mangled. The helpdesk parser also
+        # accepts the legacy pipe format, keeping CSV-seeded rows readable.
+        desc = format_request_desc(ROUTING=routing, ACCOUNT=account, NOTE=note)
 
         db = get_db()
         db.execute(
