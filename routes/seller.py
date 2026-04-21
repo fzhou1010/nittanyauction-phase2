@@ -162,7 +162,7 @@ def list_product_review():
 
     listing = session['cur_listing']
 
-    if request.method == 'POST':
+    if request.method == 'POST': 
         email = session['email']
 
         # Get next Listing_ID for this seller (per-seller, not global)
@@ -194,7 +194,6 @@ def list_product_review():
 @seller_bp.route('/questions')
 def questions():
     email = session['email']
-    #TODO: MAKE SURE TO ADD QUESTION TITLE
     #we want to query to get all of the active questiosn associated with the current seller
     active_questions = query_db('''SELECT q.question_id, q.Listing_Id, q.bidder_email, q.question_text, q.answer_text, q.answered, q.question_time, l.Auction_Title, l.Listing_ID
         FROM Questions Q, Auction_Listings l 
@@ -215,14 +214,18 @@ def questions():
     
     return render_template('seller/questions.html', active_questions=active_questions, answered_questions=answered_questions, uq_count=uq_count, aq_count = aq_count)
 
-@seller_bp.route('/question/<int:qid>') #for specific questions, which would including responding and viewing answers
+@seller_bp.route('/question/<int:qid>', methods=['GET','POST']) #for specific questions, which would including responding and viewing answers
 def question(qid):
-        # receiving the question answer from the seller regarding the listing
+    # receiving the question answer from the seller regarding the listing
     email = session['email']
-    if request.method == 'POST':
-        return
+    question = query_db('''SELECT q.question_id, q.Listing_ID, q.Bidder_Email, q.question_text, q.answer_text, q.answered, q.question_time, l.Auction_Title
+                            FROM Questions q, Auction_Listings l                                           
+                            WHERE q.Seller_Email = l.Seller_Email AND q.Listing_ID = l.Listing_ID AND q.question_id = ? AND q.Seller_Email = ?''',
+                          [qid, email], one=True) # returns one row of data per question
+    #get the answer response from the form and save
     
-    return render_template('seller/question.html', qid=qid)
+    
+    return render_template('seller/question.html', question=question)
 
                  
 @seller_bp.route('/questions/<int:qid>/answer', methods=['POST'])
