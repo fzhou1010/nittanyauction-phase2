@@ -145,7 +145,6 @@ CREATE TABLE IF NOT EXISTS Questions (
     Seller_Email TEXT NOT NULL,
     Listing_ID INTEGER NOT NULL,
     Bidder_Email TEXT NOT NULL,
-    question_title TEXT NOT NULL,
     question_text TEXT NOT NULL,
     answer_text TEXT,
     answered INTEGER DEFAULT 0, -- whether the question has been answered or not
