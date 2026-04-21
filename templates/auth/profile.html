@@ -102,7 +102,12 @@
                                         <strong>{{ card.card_type }}</strong> ending in {{ card.credit_card_num[-4:] }}
                                         <div class="text-muted small">Expires: {{ card.expire_month }}/{{ card.expire_year }}</div>
                                     </div>
-                                    <button class="btn btn-outline-danger btn-sm">Remove</button>
+                                    <form action="{{ url_for('auth.profile') }}" method="POST"
+                                          onsubmit="return confirm('Remove this card?');">
+                                        <input type="hidden" name="form_type" value="remove_card">
+                                        <input type="hidden" name="credit_card_num" value="{{ card.credit_card_num }}">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">Remove</button>
+                                    </form>
                                 </div>
                                 {% endfor %}
                             </div>
