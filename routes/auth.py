@@ -44,11 +44,14 @@ def login():
         available_roles = get_user_roles(email)
 
         if len(available_roles) == 1:
-            session['roles'] = available_roles[0]
-            if session['roles'] == 'seller':
-                return redirect(url_for(f'{available_roles[0]}.dashboard'))
+            role = available_roles[0]
+            session['roles'] = available_roles
+            session['role'] = role
+            session['available_roles'] = available_roles
+            if role == 'seller':
+                return redirect(url_for('seller.dashboard'))
             else:
-                return redirect(url_for(f'{available_roles[0]}.welcome'))
+                return redirect(url_for(f'{role}.welcome'))
         else:
             session['available_roles'] = available_roles
             return redirect(url_for('auth.choose_role'))
@@ -68,9 +71,10 @@ def set_role(role):
     if 'email' not in session:
         return redirect(url_for('auth.login'))
     if role in session.get('available_roles', []):
-        session['roles'] = role
+        session['roles'] = [role]
+        session['role'] = role
         if role == 'seller':
-            return redirect(url_for(f'{role}.dashboard'))
+            return redirect(url_for('seller.dashboard'))
         else:
             return redirect(url_for(f'{role}.welcome'))
     return redirect(url_for('auth.login'))
