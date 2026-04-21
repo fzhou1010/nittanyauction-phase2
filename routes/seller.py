@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from db import get_db, query_db
 
 seller_bp = Blueprint('seller', __name__)
@@ -188,7 +188,12 @@ def list_product_review():
         return redirect(url_for('seller.dashboard'))
 
     return render_template('seller/list_product/review.html', listing=listing)
+# Editing Listings
+@seller_bp.route('/edit_listing/<int:lid>')
+def edit_listing(lid): #should pass in the listing id
+    return render_template('seller/edit_listing')
 
+# Seller Questions
 @seller_bp.route('/questions')
 def questions():
     email = session['email']
@@ -225,7 +230,78 @@ def question(qid):
     
     return render_template('seller/question.html', question=question)
 
+# Seller Category Request
 @seller_bp.route('/request_category', methods=['GET', 'POST'])
 def request_category():
-    # TODO: new category request -> Requests table
-    return render_template('seller/request_category.html')
+    email = session['email']
+
+    # since we want to maintain a hierarichal structure for the categories, we want a parent and a child category
+    if request.method == 'POST':
+        parent_category = request.form.get('parent_category', '').strip()
+        new_category = request.form.get('new_category', '').strip()
+        sub_category = request.form.get('sub_category', '').strip()
+
+
+        #if neither are there, then error
+        if not parent_category or not new_category:
+            flash('Please select a parent category and enter a new category name.')
+            return redirect(url_for('seller.request_category'))
+
+        # check if the category already exists in db
+        is_existing = query_db('SELECT * FROM Categories WHERE category_name = ?', [new_category], one=True)
+        if is_existing:
+            flash('A category with that name already exists')
+            return redirect(url_for('seller.request_category'))
+        
+        #if the user selected a sub-category as the parent
+        if sub_category != '':
+            # get the current request id to increment by one
+            cur_id = query_db('SELECT MAX(request_id) AS cur_id FROM Requests', one=True)
+            next_id = (cur_id['cur_id'] or 0) + 1
+             #create request ticket for helpdesk to process
+            req_desc = f"Please add a new category '{new_category}' under '{sub_category}'"
+            db = get_db()
+            db.execute('''INSERT INTO Requests (request_id, sender_email, helpdesk_staff_email, request_type, request_desc, request_status)
+                      VALUES (?, ?, ?, ?, ?, 0)''',
+                   [next_id, email, 'helpdeskteam@lsu.edu', 'AddCategory', req_desc])
+            db.commit()
+            flash('Category request submitted successfully!')
+            return redirect(url_for('seller.request_category'))
+
+        # get the current request id to increment by one
+        cur_id = query_db('SELECT MAX(request_id) AS cur_id FROM Requests', one=True)
+        next_id = (cur_id['cur_id'] or 0) + 1
+
+        #create request ticket for helpdesk to process
+        req_desc = f"Please add a new category '{new_category}' under '{parent_category}'"
+        db = get_db()
+        db.execute('''INSERT INTO Requests (request_id, sender_email, helpdesk_staff_email, request_type, request_desc, request_status)
+                      VALUES (?, ?, ?, ?, ?, 0)''',
+                   [next_id, email, 'helpdeskteam@lsu.edu', 'AddCategory', req_desc])
+        db.commit()
+        flash('Category request submitted successfully!')
+        return redirect(url_for('seller.request_category'))
+
+    #we want to first get all of the root categories, where parent category attribute = 'Root'
+    root_categories = query_db("SELECT category_name FROM Categories WHERE parent_category = 'Root' ORDER BY category_name")
+    #then we can query all of the categories as row items
+    all_categories = query_db("SELECT category_name, parent_category FROM Categories ORDER BY category_name")
+
+    category_hierarchy = {}
+    # for each row item in all of the categories
+    for cat in all_categories:
+        parent = cat['parent_category']
+        if parent not in category_hierarchy: # if the parent category is not already in the dictonary as a key, make a key
+            category_hierarchy[parent] = []
+        #if the parent is already in the dictionary, add the category to the parent category key
+        category_hierarchy[parent].append(cat['category_name'])
+
+    
+
+    # get this seller's past category requests to display the current status
+    my_requests = query_db('''SELECT request_id, request_desc, request_status
+                              FROM Requests
+                              WHERE sender_email = ? AND request_type = 'AddCategory'
+                              ORDER BY request_id DESC''', [email])
+
+    return render_template('seller/request_category.html', root_categories=root_categories, category_hierarchy=category_hierarchy, my_requests=my_requests)

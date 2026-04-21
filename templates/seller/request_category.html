@@ -1,5 +1,117 @@
 {% extends "base.html" %}
+{% block title %}Request New Category{% endblock %}
 {% block content %}
-<h3>seller / request_category</h3>
-<p class="text-muted">TODO</p>
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title text-center my-3">Request a New Category</h3>
+                <p class="text-center">Please fill out the following form to request a new category!</p>
+            </div>
+            <!-- Request Form -->
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Parent Category</strong></label>
+                        <select name="parent_category" id="parent_category" class="form-select" required>
+                            <option value="">Select a top-level category</option>
+                            <!-- loop through all of the root categories and add as a option in dropdown -->
+                            {% for cat in root_categories %}
+                            <option value="{{ cat['category_name'] }}">{{ cat['category_name'] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- we want to load subcategories dynamically using js -->
+                    <div class="mb-3" id="sub_categories" style="display:none;">
+                        <label class="form-label"><strong>Subcategory (optional)</strong></label>
+                        <select name="sub_category" id="sub_category" class="form-select">
+                            <option value="">Select a sub-category here</option>
+                        </select>
+                        <small class="text-muted">If you wish to place a new category under a sub-category of the parent category, please select it here. Otherwise, the category will be placed directly under the parent category </small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="new_category" class="form-label"><strong>New Category Name</strong></label>
+                        <input type="text" name="new_category" id="new_category" class="form-control" placeholder="Please enter a new category name" required>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{{ url_for('seller.dashboard') }}" class="btn btn-outline-secondary">Back to Dashboard</a>
+                        <button type="submit" class="btn btn-primary">Submit Request</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Past Requests -->
+        {% if my_requests %}
+        <div class="card mt-4">
+            <div class="card-body">
+                <h5 class="card-title text-center mb-3">Category Request History</h5>
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Request #</th>
+                            <th>Description</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in my_requests %}
+                        <tr>
+                            <td>{{ req['request_id'] }}</td>
+                            <td>{{ req['request_desc'] }}</td>
+                            <td>
+                                {% if req['request_status'] == 0 %}
+                                    <span class="badge bg-warning text-dark">Pending</span>
+                                {% elif req['request_status'] == 1 %}
+                                    <span class="badge bg-success">Approved</span>
+                                {% else %}
+                                <!-- If the request is rejected -->
+                                    <span class="badge bg-danger">Denied</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+//we want to retrieve the category hierarchy dictionary to use in JavaScript to dynamically load sub-categories
+const hierarchy = {{ category_hierarchy | tojson }}; //convert the dicitonary to json using jinja
+
+const parentSelect = document.getElementById('parent_category');
+const subGroup = document.getElementById('sub_categories');
+const subSelect = document.getElementById('sub_category');
+
+// add event listener for when the parent select value is changed
+parentSelect.addEventListener('change', function() {
+    const parent = this.value;
+    // clear subcategory options
+    subSelect.innerHTML = '<option value="">Select a sub-category here</option>';
+    //if the parent hierarchy is selected, and there is a corresponding parent hierarchy in the dictionary
+    if (parent && hierarchy[parent] && hierarchy[parent].length > 0) {
+        const sub_categories = hierarchy[parent];
+        for (let i = 0; i < sub_categories.length; i++){
+            //create options for each sub category for the parent under sub-category select
+            const subcat_option = document.createElement('option');
+            subcat_option.value = sub_categories[i];
+            subcat_option.textContent = sub_categories[i];
+            subSelect.appendChild(subcat_option); //add the option to the dropdown select
+        }
+        // render this section
+        subGroup.style.display = 'block';
+    } 
+    // if there are no change then this section shouldnt be displayed
+    else {
+        subGroup.style.display = 'none';
+    }
+});
+</script>
 {% endblock %}

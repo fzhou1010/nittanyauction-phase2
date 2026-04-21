@@ -4,6 +4,7 @@
 <div class="row justify-content-center mt-5">
     <div class="col-md-6 text-center mb-5">
         <h2 class="">Seller Dashboard</h2>
+        <small>Welcome back, <strong>{{session['email']}}</strong></small>
     </div>
     <!-- Hero Section : Quick Access to some Aggregate Data-->
     <div class="row col-md-8">
@@ -40,7 +41,6 @@
         </div>
     </div>
     <!-- Listing Dashboard -->
-    <!-- should use tabs instead -->
     <ul class="nav nav-tabs" role="tablist">
         <li id="active_questions" class="nav-item">
             <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#active_listings_table">
