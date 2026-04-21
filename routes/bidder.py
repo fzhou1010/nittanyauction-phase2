@@ -1,10 +1,9 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from db import get_db, query_db
+from db import get_db, query_db, HELPDESK_TEAM_EMAIL
 
 bidder_bp = Blueprint('bidder', __name__)
 
 STATUS_LABELS = {1: 'Active', 0: 'Inactive', 2: 'Sold'}
-UNASSIGNED_HELPDESK = 'helpdeskteam@lsu.edu'
 
 @bidder_bp.before_request
 def require_login():
@@ -261,7 +260,7 @@ def apply_seller():
             'INSERT INTO Requests (sender_email, helpdesk_staff_email, '
             '                      request_type, request_desc, request_status) '
             'VALUES (?, ?, ?, ?, ?)',
-            [email, UNASSIGNED_HELPDESK, 'BecomeSeller', desc, 0],
+            [email, HELPDESK_TEAM_EMAIL, 'BecomeSeller', desc, 0],
         )
         db.commit()
         flash('Your seller application has been submitted for review.', 'success')

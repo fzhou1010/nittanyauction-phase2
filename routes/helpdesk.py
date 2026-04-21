@@ -1,10 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from db import get_db, query_db
+from db import get_db, query_db, HELPDESK_TEAM_EMAIL
 from notifications import notify
 
 helpdesk_bp = Blueprint('helpdesk', __name__)
-
-UNASSIGNED_EMAIL = 'helpdeskteam@lsu.edu'
 
 
 def _parse_request_desc(desc):
@@ -40,7 +38,7 @@ def welcome():
     unassigned = query_db(
         'SELECT COUNT(*) AS cnt FROM Requests '
         'WHERE helpdesk_staff_email = ? AND request_status = 0',
-        [UNASSIGNED_EMAIL], one=True
+        [HELPDESK_TEAM_EMAIL], one=True
     )['cnt']
     return render_template(
         'helpdesk/welcome.html',
@@ -57,7 +55,7 @@ def queue():
         'SELECT * FROM Requests '
         'WHERE helpdesk_staff_email = ? AND request_status = 0 '
         'ORDER BY request_id',
-        [UNASSIGNED_EMAIL],
+        [HELPDESK_TEAM_EMAIL],
     )
 
     my_requests_rows = query_db(
@@ -104,7 +102,7 @@ def claim_request(rid):
         flash('Request not found.')
         return redirect(url_for('helpdesk.queue'))
 
-    if req['helpdesk_staff_email'] != UNASSIGNED_EMAIL:
+    if req['helpdesk_staff_email'] != HELPDESK_TEAM_EMAIL:
         flash('This request has already been claimed.')
         return redirect(url_for('helpdesk.queue'))
 

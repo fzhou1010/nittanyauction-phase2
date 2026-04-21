@@ -6,6 +6,8 @@ import os
 
 DATABASE = os.path.join(os.path.dirname(__file__), 'nittanyauction.db')
 
+HELPDESK_TEAM_EMAIL = 'helpdeskteam@lsu.edu'
+
 def get_db():
     """Return a database connection for the current request.
     Reuses the same connection within a single request (stored on Flask's g object)."""
