@@ -5,7 +5,7 @@ import sqlite3 as sql
 import uuid # use uuid for generating an hex id for the address
 import hashlib
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from db import get_db, query_db
+from db import get_db, query_db, format_request_desc, HELPDESK_TEAM_EMAIL
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -313,12 +313,11 @@ def support():
         flash('Please provide a new email address.', 'danger')
         return redirect(url_for('auth.profile'))
 
-    unassigned_staff = 'helpdeskteam@lsu.edu'
-
+    desc = format_request_desc(**{'NEW EMAIL': new_email, 'REASON': request_desc})
     db = get_db()
     db.execute('''
         INSERT INTO Requests (sender_email, helpdesk_staff_email, request_type, request_desc, request_status)
-        VALUES (?, ?, ?, ?, ?)''', [sender_email, unassigned_staff, 'ChangeID', f"NEW EMAIL: {new_email} | REASON: {request_desc}", 0])
+        VALUES (?, ?, ?, ?, ?)''', [sender_email, HELPDESK_TEAM_EMAIL, 'ChangeID', desc, 0])
     db.commit()
 
     flash('Your request has been submitted. A HelpDesk staff member will review your email change.', 'success')

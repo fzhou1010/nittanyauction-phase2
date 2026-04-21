@@ -9,6 +9,8 @@ import os
 import sys
 import hashlib # my team and I will be using hashlib to implement SHA256 for the passwords saved in the database
 
+from db import HELPDESK_TEAM_EMAIL
+
 # Path to the database file and Schema
 DB_PATH = os.path.join(os.path.dirname(__file__), 'nittanyauction.db')
 SCHEMA_PATH = os.path.join(os.path.dirname(__file__), 'schema.sql')
@@ -122,6 +124,21 @@ def main():
     for filename, table, columns in LOAD_ORDER:
         count = load_csv(db, filename, table, columns)
         print(f'  {table}: {count} rows sucessfully loaded from {filename}')
+
+    # Seed the sentinel "unassigned" helpdesk account. Requests submitted by
+    # users before a staff member claims them point at this email via
+    # Requests.helpdesk_staff_email, which has a FK to Helpdesk(email). No one
+    # logs in as this account — the password is an unusable placeholder.
+    db.execute(
+        'INSERT OR IGNORE INTO Users (email, password) VALUES (?, ?)',
+        [HELPDESK_TEAM_EMAIL, '!unassigned!'],
+    )
+    db.execute(
+        'INSERT OR IGNORE INTO Helpdesk (email, position) VALUES (?, ?)',
+        [HELPDESK_TEAM_EMAIL, 'Unassigned Queue'],
+    )
+    db.commit()
+    print(f'  Seeded sentinel helpdesk account: {HELPDESK_TEAM_EMAIL}')
 
     db.execute('PRAGMA foreign_keys = ON')  # Reenable FK enforcement for normal use
     db.close()
