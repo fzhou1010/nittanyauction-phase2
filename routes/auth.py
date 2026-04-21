@@ -125,6 +125,11 @@ def register_form(role):
             city = request.form['city']
             state = request.form['state']
             address_id = uuid.uuid4().hex # generate a hex id for the address
+            credit_card_num = request.form['credit_card_num']
+            card_type = request.form['card_type']
+            expire_month = request.form['expire_month']
+            expire_year = request.form['expire_year']
+            security_code = request.form['security_code']
             try:
                 # the order of insert into matters, as we want don;t want an integrity error
                 db.execute('INSERT INTO Users (email, password) VALUES (?, ?)', [email, hashed_pswd])
@@ -134,6 +139,9 @@ def register_form(role):
                             [address_id, zipcode, street_num, street_name])
                 db.execute('INSERT INTO Bidders (email, first_name, last_name, age, home_address_id, major, phone) VALUES (?, ?, ?, ?, ?, ?, ?)',
                            [email, first_name, last_name, age, address_id, major, phone])
+                # Credit_Cards FK -> Bidders(email), so this must follow the Bidders insert
+                db.execute('INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email) VALUES (?, ?, ?, ?, ?, ?)',
+                           [credit_card_num, card_type, expire_month, expire_year, security_code, email])
                 db.commit()
                 session['email'] = email
                 session['roles'] = get_user_roles(email)
@@ -159,6 +167,11 @@ def register_form(role):
             address_id = uuid.uuid4().hex # generate a hex id for the address
             bank_account_num = request.form['bank_account_num']
             bank_routing_num = request.form['bank_routing_num']
+            credit_card_num = request.form['credit_card_num']
+            card_type = request.form['card_type']
+            expire_month = request.form['expire_month']
+            expire_year = request.form['expire_year']
+            security_code = request.form['security_code']
             try:
                 # the order of insert into matters, as we want don;t want an integrity error
                 db.execute('INSERT INTO Users (email, password) VALUES (?, ?)', [email, hashed_pswd])
@@ -167,7 +180,9 @@ def register_form(role):
                             [address_id, zipcode, street_num, street_name])
                 db.execute('INSERT INTO Bidders (email, first_name, last_name, age, home_address_id, major, phone) VALUES (?, ?, ?, ?, ?, ?, ?)',
                            [email, first_name, last_name, age, address_id, major, phone]) # since student sellers are also bidders by default, they also need to be entered into the bidders relation
-                db.execute('INSERT INTO Sellers (email, bank_routing_number, bank_account_number) VALUES (?, ?, ?)', 
+                db.execute('INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email) VALUES (?, ?, ?, ?, ?, ?)',
+                           [credit_card_num, card_type, expire_month, expire_year, security_code, email])
+                db.execute('INSERT INTO Sellers (email, bank_routing_number, bank_account_number) VALUES (?, ?, ?)',
                            [email, bank_routing_num, bank_account_num]) #we want the balance to be set to default in the schema, therefore we don't include a value here
                 db.commit()
                 session['email'] = email
