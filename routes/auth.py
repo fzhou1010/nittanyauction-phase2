@@ -5,7 +5,7 @@ import sqlite3 as sql
 import uuid # use uuid for generating an hex id for the address
 import hashlib
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from db import get_db, query_db
+from db import get_db, query_db, format_request_desc, HELPDESK_TEAM_EMAIL
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -289,11 +289,28 @@ def profile():
             security_code = request.form.get('security_code')
 
             db.execute('''
-                INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email) 
+                INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email)
                 VALUES (?, ?, ?, ?, ?, ?)''',
                 [credit_card_num, card_type, expire_month, expire_year, security_code, user_email])
             db.commit()
             flash('Card added successfully!', 'success')
+
+        elif form_type == 'remove_card':
+            # BR-22: scope the DELETE to the session owner so a crafted form
+            # cannot remove another bidder's card.
+            card_num = request.form.get('credit_card_num', '').strip()
+            if not card_num:
+                flash('Missing card reference.', 'danger')
+            else:
+                cur = db.execute(
+                    'DELETE FROM Credit_Cards WHERE credit_card_num = ? AND Owner_email = ?',
+                    [card_num, user_email],
+                )
+                db.commit()
+                if cur.rowcount:
+                    flash('Card removed.', 'success')
+                else:
+                    flash('Card not found.', 'danger')
 
         return redirect(url_for('auth.profile'))
 
@@ -312,8 +329,7 @@ def changeID():
         flash('Please provide a new email address.', 'danger')
         return redirect(url_for('auth.profile'))
 
-    unassigned_staff = 'helpdeskteam@lsu.edu'
-
+    desc = format_request_desc(**{'NEW EMAIL': new_email, 'REASON': request_desc})
     db = get_db()
     db.execute('''
         INSERT INTO Requests (sender_email, helpdesk_staff_email, request_type, request_desc, request_status)

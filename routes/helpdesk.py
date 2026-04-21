@@ -1,9 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from db import get_db, query_db
+from db import get_db, query_db, parse_request_desc, HELPDESK_TEAM_EMAIL
+from notifications import notify
 
 helpdesk_bp = Blueprint('helpdesk', __name__)
-
-UNASSIGNED_EMAIL = 'helpdeskteam@lsu.edu'
 
 
 @helpdesk_bp.before_request
@@ -26,7 +25,7 @@ def welcome():
     unassigned = query_db(
         'SELECT COUNT(*) AS cnt FROM Requests '
         'WHERE helpdesk_staff_email = ? AND request_status = 0',
-        [UNASSIGNED_EMAIL], one=True
+        [HELPDESK_TEAM_EMAIL], one=True
     )['cnt']
     return render_template(
         'helpdesk/welcome.html',
@@ -43,15 +42,23 @@ def queue():
         'SELECT * FROM Requests '
         'WHERE helpdesk_staff_email = ? AND request_status = 0 '
         'ORDER BY request_id',
-        [UNASSIGNED_EMAIL],
+        [HELPDESK_TEAM_EMAIL],
     )
 
-    my_requests = query_db(
+    my_requests_rows = query_db(
         'SELECT * FROM Requests '
         'WHERE helpdesk_staff_email = ? AND request_status = 0 '
         'ORDER BY request_id',
         [staff_email],
     )
+
+    # Pre-parse the pipe-separated request_desc payload so the template can
+    # render a clean field-by-field view instead of raw text.
+    my_requests = []
+    for row in my_requests_rows:
+        entry = dict(row)
+        entry['parsed'] = parse_request_desc(row['request_desc'])
+        my_requests.append(entry)
 
     completed = query_db(
         'SELECT * FROM Requests '
@@ -82,7 +89,7 @@ def claim_request(rid):
         flash('Request not found.')
         return redirect(url_for('helpdesk.queue'))
 
-    if req['helpdesk_staff_email'] != UNASSIGNED_EMAIL:
+    if req['helpdesk_staff_email'] != HELPDESK_TEAM_EMAIL:
         flash('This request has already been claimed.')
         return redirect(url_for('helpdesk.queue'))
 
@@ -119,6 +126,10 @@ def handle_request(rid):
     if action == 'deny':
         db.execute(
             'UPDATE Requests SET request_status = 2 WHERE request_id = ?', [rid]
+        )
+        notify(
+            req['sender_email'], 'request_denied',
+            f'Your request #{rid} ({req["request_type"]}) was denied by HelpDesk staff.',
         )
         db.commit()
         flash(f'Request #{rid} denied.')
@@ -223,10 +234,38 @@ def _handle_market_analysis(db, req):
     return None
 
 
+def _handle_become_seller(db, req):
+    sender = req['sender_email']
+    parts = parse_request_desc(req['request_desc'])
+    routing = parts.get('ROUTING')
+    account = parts.get('ACCOUNT')
+
+    if not routing or not account:
+        return 'Banking details missing from this application.'
+
+    if not query_db('SELECT 1 FROM Bidders WHERE email = ?', [sender], one=True):
+        return 'Applicant is no longer a registered bidder.'
+
+    if query_db('SELECT 1 FROM Sellers WHERE email = ?', [sender], one=True):
+        return 'Applicant is already a seller.'
+
+    db.execute(
+        'INSERT INTO Sellers (email, bank_routing_number, bank_account_number) '
+        'VALUES (?, ?, ?)',
+        [sender, routing, account],
+    )
+    notify(
+        sender, 'seller_approved',
+        'Your seller application has been approved. You can now list items for auction.',
+    )
+    return None
+
+
 _REQUEST_HANDLERS = {
     'AddCategory': _handle_add_category,
     'ChangeID': _handle_change_id,
     'MarketAnalysis': _handle_market_analysis,
+    'BecomeSeller': _handle_become_seller,
 }
 
 
