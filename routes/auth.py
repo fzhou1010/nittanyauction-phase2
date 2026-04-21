@@ -328,8 +328,9 @@ def changeID():
     if not new_email:
         flash('Please provide a new email address.', 'danger')
         return redirect(url_for('auth.profile'))
+    
+    unassigned_staff = 'helpdeskteam@lsu.edu'
 
-    desc = format_request_desc(**{'NEW EMAIL': new_email, 'REASON': request_desc})
     db = get_db()
     db.execute('''
         INSERT INTO Requests (sender_email, helpdesk_staff_email, request_type, request_desc, request_status)
