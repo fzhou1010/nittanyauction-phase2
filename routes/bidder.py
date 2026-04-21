@@ -205,8 +205,37 @@ def notifications_mark_read():
 
 @bidder_bp.route('/rate/<seller_email>', methods=['GET', 'POST'])
 def rate_seller(seller_email):
-    # TODO: rating form + insert
-    return render_template('bidder/rate_seller.html')
+    email = session["email"]
+
+    already_rated = query_db(
+        "SELECT 1 FROM Rating WHERE Bidder_Email = ? AND Seller_Email = ?", [email, seller_email], one=True
+    )
+    
+    if request.method == "POST":
+        if already_rated:
+            flash('You have already reated this seller', 'warning')
+            return redirect(url_for('bidder/rate/<seller_email>'))
+        
+        rating = request.form.get('choice', '').strip()
+        description = request.form.get('note', '').strip()
+        
+        desc = format_request_desc(RATING=rating, DESCRIPTION=description)
+
+        db = get_db()
+        db.execute(
+            'INSERT INTO Rating (Bidder_Email, Seller_Email, '
+            '                      Date, Rating, Rating_Desc) '
+            'VALUES (?, ?, ?, ?, ?)',
+            [email, seller_email, "GETDATE()", rating, description],
+        )
+        db.commit()
+        flash('Your review has been recieved. Thank you.', 'success')
+        return redirect(url_for('bidder.welcome'))
+        
+
+    return render_template('bidder/rate_seller.html',
+                           already_rated = already_rated,
+                           form={})
 
 @bidder_bp.route('/apply_seller', methods=['GET', 'POST'])
 def apply_seller():
