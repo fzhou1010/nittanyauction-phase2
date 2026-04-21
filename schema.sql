@@ -166,6 +166,20 @@ CREATE TABLE IF NOT EXISTS Watchlist (
     FOREIGN KEY (category) REFERENCES Categories(category_name)
 );
 
+-- Notifications: per-user events emitted by the system (auction ended, outbid, etc.)
+CREATE TABLE IF NOT EXISTS Notifications (
+    notification_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    recipient_email TEXT NOT NULL,
+    notif_type TEXT NOT NULL,
+    message TEXT NOT NULL,
+    seller_email TEXT,
+    listing_id INTEGER,
+    is_read INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (recipient_email) REFERENCES Users(email) ON DELETE CASCADE,
+    FOREIGN KEY (seller_email, listing_id) REFERENCES Auction_Listings(Seller_Email, Listing_ID)
+);
+
 -- Shopping Cart: bidders save listings for quick access and direct bidding
 CREATE TABLE IF NOT EXISTS Shopping_Cart (
     Bidder_Email TEXT NOT NULL,

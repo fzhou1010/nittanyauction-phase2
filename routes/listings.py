@@ -1,14 +1,54 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from db import get_db, query_db
+from notifications import notify
 
 listings_bp = Blueprint('listings', __name__)
+
+
+def _notify_auction_close(seller_email, listing_id, title, outcome, winner=None, amount=None):
+    """Notify every bidder and cart-holder of the auction outcome."""
+    bidders = query_db(
+        'SELECT DISTINCT Bidder_Email FROM Bids WHERE Seller_Email = ? AND Listing_ID = ?',
+        [seller_email, listing_id],
+    )
+    bidder_emails = {row['Bidder_Email'] for row in bidders}
+
+    cart_holders = query_db(
+        'SELECT DISTINCT Bidder_Email FROM Shopping_Cart WHERE Seller_Email = ? AND Listing_ID = ?',
+        [seller_email, listing_id],
+    )
+    cart_emails = {row['Bidder_Email'] for row in cart_holders}
+
+    if outcome == 'sold':
+        for email in bidder_emails:
+            if email == winner:
+                notify(email, 'auction_won',
+                       f'You won "{title}" for ${amount:.2f}. Complete payment to finalize.',
+                       seller_email, listing_id)
+            else:
+                notify(email, 'auction_lost',
+                       f'Auction ended for "{title}". Another bidder won.',
+                       seller_email, listing_id)
+        for email in cart_emails - bidder_emails:
+            notify(email, 'cart_auction_ended',
+                   f'An auction in your cart ended: "{title}" was sold.',
+                   seller_email, listing_id)
+    else:  # failed
+        for email in bidder_emails:
+            notify(email, 'auction_failed',
+                   f'Auction ended for "{title}" — reserve price was not met.',
+                   seller_email, listing_id)
+        for email in cart_emails - bidder_emails:
+            notify(email, 'cart_auction_ended',
+                   f'An auction in your cart ended without a sale: "{title}".',
+                   seller_email, listing_id)
 
 
 def check_auction_complete(seller_email, listing_id):
     """Evaluate whether an auction has reached Max_bids and resolve it.
 
     Returns a dict describing the outcome, or None if the auction is still active.
-    Side-effect: updates Auction_Listings.Status (2=sold, 0=failed).
+    Side-effect: updates Auction_Listings.Status (2=sold, 0=failed) and emits notifications.
     """
     listing = query_db(
         'SELECT * FROM Auction_Listings WHERE Seller_Email = ? AND Listing_ID = ?',
@@ -33,11 +73,14 @@ def check_auction_complete(seller_email, listing_id):
     )
 
     db = get_db()
+    title = listing['Auction_Title'] or listing['Product_Name'] or 'Listing'
     if highest['Bid_Price'] >= listing['Reserve_Price']:
         db.execute(
             'UPDATE Auction_Listings SET Status = 2 WHERE Seller_Email = ? AND Listing_ID = ?',
             [seller_email, listing_id],
         )
+        _notify_auction_close(seller_email, listing_id, title, 'sold',
+                              winner=highest['Bidder_Email'], amount=highest['Bid_Price'])
         db.commit()
         return {'status': 'sold', 'winner': highest['Bidder_Email'], 'amount': highest['Bid_Price']}
 
@@ -45,6 +88,7 @@ def check_auction_complete(seller_email, listing_id):
         'UPDATE Auction_Listings SET Status = 0 WHERE Seller_Email = ? AND Listing_ID = ?',
         [seller_email, listing_id],
     )
+    _notify_auction_close(seller_email, listing_id, title, 'failed')
     db.commit()
     return {'status': 'failed'}
 
@@ -182,7 +226,7 @@ def detail(seller_email, listing_id):
         'listings/detail.html',
         listing=listing, bids=bids, category_path=category_path,
         questions=questions, winner_email=winner_email, has_paid=has_paid,
-        remaining_bids=remaining_bids, in_cart=in_cart
+        remaining_bids=remaining_bids, in_cart=in_cart,
     )
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>/bid', methods=['POST'])
@@ -222,7 +266,17 @@ def place_bid(seller_email, listing_id):
     if auction['Max_bids'] and current_bids['total'] >= auction['Max_bids']:
         flash('This listing has reached the maximum number of bids and is now closed.', 'danger')
         return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
-    
+
+    # Turn-taking rule: same bidder cannot place consecutive bids on the same listing
+    last_bidder = query_db(
+        'SELECT Bidder_Email FROM Bids WHERE Seller_Email = ? AND Listing_ID = ? '
+        'ORDER BY Bid_ID DESC LIMIT 1',
+        [seller_email, listing_id], one=True,
+    )
+    if last_bidder and last_bidder['Bidder_Email'] == user_email:
+        flash('You cannot place consecutive bids — wait for another bidder first.', 'danger')
+        return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
+
     # if there are no bids yet, the minimum required bid is the reserve price (or 0 if no reserve). Otherwise, it must be at least $1 higher than the current highest bid.
     if current_bids['highest_bid'] is None:
         min_required = auction['Reserve_Price'] or 0.0
@@ -239,22 +293,19 @@ def place_bid(seller_email, listing_id):
         INSERT INTO Bids (Seller_Email, Listing_ID, Bidder_Email, Bid_Price)
         VALUES (?, ?, ?, ?)
     ''', (seller_email, listing_id, user_email, bid_amount))
-
     db.commit()
 
+    # Auction may have just reached Max_bids — resolve to Sold (reserve met) or Failed.
     outcome = check_auction_complete(seller_email, listing_id)
-
-    if outcome:
-        if outcome['status'] == 'sold':
-            flash(f"Auction closed! Winner: {outcome['winner']} with a bid of ${outcome['amount']:.2f}.", 'success')
+    if outcome and outcome['status'] == 'sold':
+        if outcome['winner'] == user_email:
+            flash('You won the auction! Complete payment to finalize.', 'success')
         else:
-            flash("Auction closed: Reserve price was not met.", 'info')
+            flash('Your bid was placed, but another bidder won the auction.', 'info')
+    elif outcome and outcome['status'] == 'failed':
+        flash('Auction ended — reserve price was not met.', 'warning')
     else:
         flash('Your bid has been placed.', 'success')
-
-    flash('Your bid has been placed.', 'success')
-    
-    # TODO: bid validation + insertion, max_bids auto-close
     return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>/question', methods=['POST'])

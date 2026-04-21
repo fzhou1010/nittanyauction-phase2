@@ -2,11 +2,28 @@
 # Run this file (python app.py) to start the NittanyAuction server on http://127.0.0.1:5000
 
 from flask import Flask, session, redirect, url_for
-from db import close_db
+from db import close_db, query_db
 
 app = Flask(__name__)
 app.secret_key = 'nittany-auction-dev-key'       # Used by Flask to sign session cookies
 app.teardown_appcontext(close_db)                # Auto-close the DB connection after each request
+
+
+@app.context_processor
+def inject_notifications():
+    """Expose unread notification count and a short preview list to every template."""
+    if 'email' not in session or 'bidder' not in session.get('roles', []):
+        return {}
+    unread_count = query_db(
+        'SELECT COUNT(*) AS n FROM Notifications WHERE recipient_email = ? AND is_read = 0',
+        [session['email']], one=True,
+    )['n']
+    recent = query_db(
+        'SELECT notification_id, notif_type, message, seller_email, listing_id, is_read, created_at '
+        'FROM Notifications WHERE recipient_email = ? ORDER BY created_at DESC LIMIT 5',
+        [session['email']],
+    )
+    return {'nav_unread_count': unread_count, 'nav_recent_notifications': recent}
 
 # Import and register each route blueprint (groups of related pages)
 from routes.auth import auth_bp

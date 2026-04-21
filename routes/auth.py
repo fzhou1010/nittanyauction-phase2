@@ -274,3 +274,28 @@ def profile():
         return redirect(url_for('auth.profile'))
 
     return render_template('auth/profile.html', user=user_info, address=address_info, cards=cards)
+
+
+@auth_bp.route('/profile/support', methods=['POST'])
+def support():
+    if 'email' not in session:
+        return redirect(url_for('auth.login'))
+    
+    new_email = request.form.get('new_email', '').strip()
+    request_desc = request.form.get('reason', '').strip()
+    sender_email = session['email']
+
+    if not new_email:
+        flash('Please provide a new email address.', 'danger')
+        return redirect(url_for('auth.profile'))
+
+    unassigned_staff = 'helpdeskteam@lsu.edu'
+
+    db = get_db()
+    db.execute('''
+        INSERT INTO Requests (sender_email, helpdesk_staff_email, request_type, request_desc, request_status)
+        VALUES (?, ?, ?, ?, ?)''', [sender_email, unassigned_staff, 'ChangeID', f"NEW EMAIL: {new_email} | REASON: {request_desc}", 0])
+    db.commit()
+
+    flash('Your request has been submitted. A HelpDesk staff member will review your email change.', 'success')
+    return redirect(url_for('auth.profile'))

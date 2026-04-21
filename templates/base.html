@@ -12,10 +12,62 @@
     <div class="container">
         <a class="navbar-brand" href="/">NittanyAuction</a>
         {% if session.get('email') %}
-        <div class="navbar-nav ms-auto">
+        <div class="navbar-nav ms-auto align-items-lg-center">
             <!-- local vendors shouldnt be able to browse -->
             {% if 'bidder' in session.get('roles', []) %} <!-- this is because student sellers are also bidders by default -->
             <a class="nav-link" href="{{ url_for('listings.browse') }}">Browse</a>
+            <div class="nav-item dropdown">
+                <a class="nav-link position-relative" href="#" id="notifDropdown" role="button"
+                   data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications">
+                    <i class="bi bi-bell-fill"></i>
+                    {% if nav_unread_count and nav_unread_count > 0 %}
+                    <span class="position-absolute top-50 start-100 translate-middle badge rounded-pill bg-danger"
+                          style="font-size: 0.65rem;">
+                        {{ nav_unread_count if nav_unread_count < 100 else '99+' }}
+                    </span>
+                    {% endif %}
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notifDropdown"
+                    style="min-width: 320px; max-width: 360px;">
+                    <li class="dropdown-header d-flex justify-content-between align-items-center">
+                        <span>Notifications</span>
+                        {% if nav_unread_count and nav_unread_count > 0 %}
+                        <form method="post" action="{{ url_for('bidder.notifications_mark_read') }}"
+                              class="m-0">
+                            <input type="hidden" name="next" value="{{ request.path }}">
+                            <button type="submit" class="btn btn-link btn-sm p-0">Mark all read</button>
+                        </form>
+                        {% endif %}
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    {% if not nav_recent_notifications %}
+                    <li><span class="dropdown-item-text text-muted small">No notifications yet.</span></li>
+                    {% else %}
+                        {% for n in nav_recent_notifications %}
+                        <li>
+                            {% if n.seller_email and n.listing_id %}
+                            <a class="dropdown-item text-wrap small {% if not n.is_read %}fw-bold{% endif %}"
+                               href="{{ url_for('listings.detail', seller_email=n.seller_email, listing_id=n.listing_id) }}">
+                                {{ n.message }}
+                                <div class="text-muted small fw-normal">{{ n.created_at }}</div>
+                            </a>
+                            {% else %}
+                            <span class="dropdown-item-text text-wrap small {% if not n.is_read %}fw-bold{% endif %}">
+                                {{ n.message }}
+                                <div class="text-muted small fw-normal">{{ n.created_at }}</div>
+                            </span>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    {% endif %}
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item text-center small" href="{{ url_for('bidder.notifications') }}">
+                            View all notifications
+                        </a>
+                    </li>
+                </ul>
+            </div>
             {% endif %}
             <a class="nav-link" href="{{ url_for('auth.profile') }}">{{ session['email'] }}</a>
             <a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a>
