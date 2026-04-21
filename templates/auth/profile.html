@@ -12,10 +12,20 @@
                                 {{ user.first_name[0] if user else 'U' }}
                             </div>
                         </div>
-                        <h5 class="mb-0">{{ user.first_name }} {{ user.last_name }}</h5>
+                        <h5 class="mb-0">{{ user.first_name if user else '' }} {{ user.last_name if user else '' }}</h5>
                         <p class="text-muted small">{{ session['email'] }}</p>
                         <hr>
-                        <p class="badge bg-info text-dark">{{ user.major or 'Student' }}</p>
+                        {% if session['role'] == 'bidder' and user %}
+                            {% if user.major %}
+                                <p class="badge bg-info text-dark">{{ user.major }}</p>
+                            {% else %}
+                                <p class="badge bg-secondary text-dark">Student</p>
+                            {% endif %}
+                        {% elif session['role'] == 'seller' %}
+                            <p class="badge bg-success text-white">Seller</p>
+                        {% elif session['role'] == 'helpdesk' %}
+                            <p class="badge bg-warning text-dark">HelpDesk</p>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -32,6 +42,11 @@
                     <a class="list-group-item list-group-item-action" id="support-list" data-bs-toggle="list" href="#pane-support" role="tab">
                         <i class="bi bi-question-circle me-2"></i>Support
                     </a>
+                    {% if session.get('available_roles') %}
+                    <a class="list-group-item list-group-item-action" id="role-list" data-bs-toggle="list" href="#pane-role" role="tab">
+                        <i class="bi bi-arrow-left-right me-2"></i>Switch Role
+                    </a>
+                    {% endif %}
                     <a class="list-group-item list-group-item-action text-danger" href="{{ url_for('auth.logout') }}">
                         <i class="bi bi-box-arrow-right me-2"></i>Logout
                     </a>
@@ -153,8 +168,36 @@
                             </div>
                             <button type="submit" class="btn btn-info">Submit Request to HelpDesk</button>
                         </form>
+                        <hr>
                     </div>
                 </div>
+                {% if session.get('available_roles') %}
+                <div class="tab-pane fade" id="pane-role" role="tabpanel">
+                    <div class="card shadow-sm p-4">
+                        <h3 class="mb-4">Switch Role</h3>
+                        <p class="text-muted small">You are currently logged in as <strong>{{ session['role'] }}</strong>.</p>
+                        <div class="d-grid gap-2">
+                            {% for role in session['available_roles'] %}
+                                {% if role != session['role'] %}
+                                    {% if role == 'helpdesk' %}
+                                        <a href="{{ url_for('auth.set_role', role=role) }}" class="btn btn-warning">
+                                            <i class="bi bi-headset me-2"></i>Switch to HelpDesk
+                                        </a>
+                                    {% elif role == 'seller' %}
+                                        <a href="{{ url_for('auth.set_role', role=role) }}" class="btn btn-success">
+                                            <i class="bi bi-shop me-2"></i>Switch to Seller
+                                        </a>
+                                    {% elif role == 'bidder' %}
+                                        <a href="{{ url_for('auth.set_role', role=role) }}" class="btn btn-primary">
+                                            <i class="bi bi-hammer me-2"></i>Switch to Bidder
+                                        </a>
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
 
             </div>
         </div>

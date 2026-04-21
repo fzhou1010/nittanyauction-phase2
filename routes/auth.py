@@ -35,22 +35,45 @@ def login():
         user = query_db('SELECT * FROM Users WHERE email = ? AND password = ?',
                         [email, hashed], one=True)
 
-        if user:
-            # Store user info in the session so other pages know who is logged in
-            session['email'] = email
-            roles = get_user_roles(email)
-            session['roles'] = roles
+        if not user:
+            flash('Invalid email or password.')
+            return render_template('auth/login.html')
 
-            # Redirect to the appropriate welcome page based on the user's role
-            if 'helpdesk' in roles:
-                return redirect(url_for('helpdesk.welcome'))
-            elif 'seller' in roles:
-                return redirect(url_for('seller.dashboard'))
+        session['email'] = email
+
+        available_roles = get_user_roles(email)
+
+        if len(available_roles) == 1:
+            session['roles'] = available_roles[0]
+            if session['roles'] == 'seller':
+                return redirect(url_for(f'{available_roles[0]}.dashboard'))
             else:
-                return redirect(url_for('bidder.welcome'))
+                return redirect(url_for(f'{available_roles[0]}.welcome'))
+        else:
+            session['available_roles'] = available_roles
+            return redirect(url_for('auth.choose_role'))
 
-        flash('Invalid email or password.')
     return render_template('auth/login.html')
+
+@auth_bp.route('/choose_role')
+def choose_role():
+    if 'email' not in session:
+        return redirect(url_for('auth.login'))
+    if 'available_roles' not in session:
+        return redirect(url_for('auth.login'))
+    return render_template('auth/choose_role.html')
+
+@auth_bp.route('/set_role/<role>')
+def set_role(role):
+    if 'email' not in session:
+        return redirect(url_for('auth.login'))
+    if role in session.get('available_roles', []):
+        session['roles'] = role
+        if role == 'seller':
+            return redirect(url_for(f'{role}.dashboard'))
+        else:
+            return redirect(url_for(f'{role}.welcome'))
+    return redirect(url_for('auth.login'))
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
@@ -179,12 +202,13 @@ def register_form(role):
                 session['email'] = email
                 session['roles'] = get_user_roles(email)
                 return redirect(url_for('seller.welcome')) #Todo: Make a local vendor welcome page, or should it be the same as the seller page
-            except Exception as e:                                                                                                    
-                flash(f'Error saving information: {e}')
-                return render_template('auth/register_form.html', role=role)
             except sql.IntegrityError:
                 flash('Error saving information into the database.')
                 return render_template('auth/register_form.html', role=role)
+            except Exception as e:                                                                                                    
+                flash(f'Error saving information: {e}')
+                return render_template('auth/register_form.html', role=role)
+            
             
 
 
