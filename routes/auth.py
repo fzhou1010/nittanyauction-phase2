@@ -317,13 +317,12 @@ def profile():
     return render_template('auth/profile.html', user=user_info, address=address_info, cards=cards)
 
 
-@auth_bp.route('/profile/support', methods=['POST'])
-def support():
+@auth_bp.route('/profile/changeID', methods=['POST'])
+def changeID():
     if 'email' not in session:
         return redirect(url_for('auth.login'))
     
     new_email = request.form.get('new_email', '').strip()
-    request_desc = request.form.get('reason', '').strip()
     sender_email = session['email']
 
     if not new_email:
@@ -334,8 +333,35 @@ def support():
     db = get_db()
     db.execute('''
         INSERT INTO Requests (sender_email, helpdesk_staff_email, request_type, request_desc, request_status)
-        VALUES (?, ?, ?, ?, ?)''', [sender_email, HELPDESK_TEAM_EMAIL, 'ChangeID', desc, 0])
+        VALUES (?, ?, ?, ?, ?)''', [sender_email, unassigned_staff, 'ChangeID', f"NEW EMAIL: {new_email}", 0])
     db.commit()
 
     flash('Your request has been submitted. A HelpDesk staff member will review your email change.', 'success')
+    return redirect(url_for('auth.profile'))
+
+@auth_bp.route('/profile/promote', methods=['POST'])
+def promote():
+    if 'email' not in session:
+        return redirect(url_for('auth.login'))
+    
+    user_email = session['email']    
+
+    account_number = request.form.get('account_number','').strip()
+    routing_number = request.form.get('routing_number','').strip()
+
+    if not account_number or not routing_number:
+        flash('Please provide both bank account number and routing number to apply for seller promotion.', 'danger')
+        return redirect(url_for('auth.profile'))
+    
+    unassigned_staff = 'helpdeskteam@lsu.edu'
+    
+    request_desc = f"ROUTING:{routing_number} | ACCOUNT:{account_number}"
+    db = get_db()
+
+    db.execute('''
+        INSERT INTO Requests (sender_email, helpdesk_staff_email, request_type, request_desc, request_status)
+        VALUES (?, ?, ?, ?, ?)''', [user_email, unassigned_staff, 'BecomeSeller', request_desc , 0])
+    db.commit()
+
+    flash('Your request has been submitted. A HelpDesk staff member will review your request.', 'success')
     return redirect(url_for('auth.profile'))
