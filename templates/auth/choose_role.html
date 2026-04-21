@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-4">
+            <div class="card shadow-sm p-4 text-center">
+                <h3 class="mb-4">Choose Your Role</h3>
+                <p class="text-muted mb-4">Your account has multiple roles. How would you like to log in?</p>
+                
+                {% for role in session['available_roles'] %}
+                    {% if role == 'helpdesk' %}
+                        <a href="{{ url_for('auth.set_role', role='helpdesk') }}" class="btn btn-warning mb-2 w-100">
+                            <i class="bi bi-headset me-2"></i>HelpDesk
+                        </a>
+                    {% elif role == 'seller' %}
+                        <a href="{{ url_for('auth.set_role', role='seller') }}" class="btn btn-success mb-2 w-100">
+                            <i class="bi bi-shop me-2"></i>Seller
+                        </a>
+                    {% elif role == 'bidder' %}
+                        <a href="{{ url_for('auth.set_role', role='bidder') }}" class="btn btn-primary mb-2 w-100">
+                            <i class="bi bi-hammer me-2"></i>Bidder
+                        </a>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
