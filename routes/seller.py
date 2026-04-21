@@ -13,7 +13,7 @@ def require_seller():
 
 @seller_bp.route('/welcome')
 def welcome():
-    return render_template('seller/welcome.html')
+    return redirect(url_for('seller.dashboard'))
 
 @seller_bp.route('/dashboard')
 def dashboard():
