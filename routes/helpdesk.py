@@ -142,6 +142,10 @@ def handle_request(rid):
         db.execute(
             'UPDATE Requests SET request_status = 2 WHERE request_id = ?', [rid]
         )
+        notify(
+            req['sender_email'], 'request_denied',
+            f'Your request #{rid} ({req["request_type"]}) was denied by HelpDesk staff.',
+        )
         db.commit()
         flash(f'Request #{rid} denied.')
         return redirect(url_for('helpdesk.queue'))
