@@ -47,7 +47,13 @@
                     <td>{{ r['request_id'] }}</td>
                     <td><span class="badge bg-info text-dark">{{ r['request_type'] }}</span></td>
                     <td>{{ r['sender_email'] }}</td>
-                    <td>{{ r['request_desc'] or '—' }}</td>
+                    <td>
+                        {% if r['request_type'] == 'PendingRole' %}
+                            Pending user role application
+                        {% else %}
+                            {{ r['request_desc'] or '—' }}
+                        {% endif %}
+                    </td>
                     <td>
                         <form method="post" action="{{ url_for('helpdesk.claim_request', rid=r['request_id']) }}">
                             <button class="btn btn-sm btn-outline-primary">Claim</button>
@@ -176,7 +182,13 @@
                     <td>{{ r['request_id'] }}</td>
                     <td>{{ r['request_type'] }}</td>
                     <td>{{ r['sender_email'] }}</td>
-                    <td>{{ r['request_desc'] or '—' }}</td>
+                    <td>
+                        {% if r['request_type'] == 'PendingRole' %}
+                            Pending user role application
+                        {% else %}
+                            {{ r['request_desc'] or '—' }}
+                        {% endif %}
+                    </td>
                     <td>
                         {% if r['request_status'] == 1 %}
                         <span class="badge bg-success">Approved</span>

@@ -84,6 +84,56 @@ def set_role(role):
             return redirect(url_for(f'{role}.welcome'))
     return redirect(url_for('auth.login'))
 
+def _build_pending_prefill(email, last_request):
+    # Pull whatever we already know about this email from prior state so the user
+    # doesn't have to retype on resubmit. Priority: prior PendingRole payload,
+    # then any partial Bidders / Address / Credit_Cards / Sellers rows (covers
+    # edge cases like a previously-approved account that got re-orphaned).
+    prefill = {}
+    if last_request is not None:
+        for k, v in parse_request_desc(last_request['request_desc']).items():
+            if v not in (None, ''):
+                prefill[k] = v
+
+    bidder = query_db('SELECT * FROM Bidders WHERE email = ?', [email], one=True)
+    if bidder:
+        for field in ('first_name', 'last_name', 'age', 'major', 'phone'):
+            val = bidder[field]
+            if val not in (None, '') and not prefill.get(field):
+                prefill[field] = val
+        if bidder['home_address_id']:
+            addr = query_db(
+                'SELECT a.*, z.city, z.state FROM Address a '
+                'LEFT JOIN Zipcode_Info z ON a.zipcode = z.zipcode '
+                'WHERE a.address_id = ?',
+                [bidder['home_address_id']], one=True,
+            )
+            if addr:
+                for field in ('street_num', 'street_name', 'zipcode', 'city', 'state'):
+                    val = addr[field]
+                    if val not in (None, '') and not prefill.get(field):
+                        prefill[field] = val
+
+    cc = query_db(
+        'SELECT * FROM Credit_Cards WHERE Owner_email = ? LIMIT 1',
+        [email], one=True,
+    )
+    if cc:
+        for field in ('credit_card_num', 'card_type', 'expire_month', 'expire_year', 'security_code'):
+            val = cc[field]
+            if val not in (None, '') and not prefill.get(field):
+                prefill[field] = val
+
+    seller = query_db('SELECT * FROM Sellers WHERE email = ?', [email], one=True)
+    if seller:
+        if not prefill.get('bank_routing_num') and seller['bank_routing_number']:
+            prefill['bank_routing_num'] = seller['bank_routing_number']
+        if not prefill.get('bank_account_num') and seller['bank_account_number']:
+            prefill['bank_account_num'] = seller['bank_account_number']
+
+    return prefill
+
+
 @auth_bp.route('/pending_user', methods=['GET', 'POST'])
 def pending_user():
     # Guard: require an authenticated session.
@@ -92,11 +142,24 @@ def pending_user():
 
     email = session['email']
 
-    # Guard: if user already has any role, they should not be on this page.
+    # Role may have been approved since this session was established (e.g. user
+    # refreshes the pending page after HelpDesk clicks Complete). Refresh the
+    # session's role cache and route them into their new welcome flow instead
+    # of sending them back through /login.
     current_roles = get_user_roles(email)
     if current_roles:
-        flash('You already have a role.')
-        return redirect(url_for('auth.login'))
+        session['roles'] = current_roles
+        session['available_roles'] = current_roles
+        if len(current_roles) == 1:
+            role = current_roles[0]
+            session['role'] = role
+            flash('Your role has been approved. Welcome!')
+            if role == 'seller':
+                return redirect(url_for('seller.dashboard'))
+            return redirect(url_for(f'{role}.welcome'))
+        # Multi-role (e.g. seller approval inserts into both Bidders and Sellers).
+        flash('Your role has been approved. Please choose which role to use.')
+        return redirect(url_for('auth.choose_role'))
 
     db = get_db()
 
@@ -210,14 +273,14 @@ def pending_user():
             status='denied',
             last_request=last_request,
             requested_role=None,
-            prefill={},
+            prefill=_build_pending_prefill(email, last_request),
         )
     return render_template(
         'auth/pending_user.html',
         status='new',
         last_request=None,
         requested_role=None,
-        prefill={},
+        prefill=_build_pending_prefill(email, None),
     )
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
