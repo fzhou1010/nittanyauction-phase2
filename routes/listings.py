@@ -494,6 +494,13 @@ def pay(seller_email, listing_id):
         if not (credit_card_num and card_type and expire_month and expire_year and security_code):
             flash('Please fill out every card field.', 'danger')
             return redirect(url_for('listings.pay', seller_email=seller_email, listing_id=listing_id))
+        mine = query_db(
+            'SELECT 1 FROM Credit_Cards WHERE credit_card_num = ? AND Owner_email = ?',
+            [credit_card_num, email], one=True,
+        )
+        if mine:
+            flash('You already have that card on your account.', 'danger')
+            return redirect(url_for('listings.pay', seller_email=seller_email, listing_id=listing_id))
         import sqlite3
         try:
             db = get_db()
@@ -505,7 +512,7 @@ def pay(seller_email, listing_id):
             db.commit()
             flash('Card added.', 'success')
         except sqlite3.IntegrityError:
-            flash('That card number is already on file.', 'danger')
+            flash('Cards cannot be shared across accounts — this card is already registered to another user.', 'danger')
         return redirect(url_for('listings.pay', seller_email=seller_email, listing_id=listing_id))
 
     selected_card = request.form.get('credit_card_num', '').strip()

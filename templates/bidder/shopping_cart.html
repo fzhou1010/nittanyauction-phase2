@@ -24,15 +24,15 @@
     </div>
 {% else %}
     <div class="table-responsive">
-        <table class="table align-middle">
+        <table class="table align-middle text-center">
             <thead>
                 <tr>
-                    <th>Listing</th>
-                    <th>Seller</th>
-                    <th>Current Bid</th>
-                    <th>Remaining</th>
-                    <th>Status</th>
-                    <th>Quick Bid</th>
+                    <th class="text-center">Listing</th>
+                    <th class="text-center">Seller</th>
+                    <th class="text-center">Current Bid</th>
+                    <th class="text-center">Remaining</th>
+                    <th class="text-center">Status</th>
+                    <th class="text-center">Quick Bid</th>
                     <th></th>
                 </tr>
             </thead>
@@ -72,7 +72,7 @@
                     </td>
                     <td>
                         {% if item.status == 1 %}
-                        <form action="{{ url_for('listings.place_bid', seller_email=item.seller_email, listing_id=item.listing_id) }}" method="post" class="d-flex">
+                        <form action="{{ url_for('listings.place_bid', seller_email=item.seller_email, listing_id=item.listing_id) }}" method="post" class="d-flex justify-content-center">
                             <div class="input-group input-group-sm" style="max-width: 180px;">
                                 <span class="input-group-text">$</span>
                                 <input type="number" name="bid_amount" class="form-control"
@@ -83,7 +83,7 @@
                         </form>
                         {% endif %}
                     </td>
-                    <td class="text-end">
+                    <td class="text-center">
                         <form action="{{ url_for('bidder.cart_remove') }}" method="post" class="d-inline">
                             <input type="hidden" name="seller_email" value="{{ item.seller_email }}">
                             <input type="hidden" name="listing_id" value="{{ item.listing_id }}">

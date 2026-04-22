@@ -5,7 +5,7 @@ import sqlite3 as sql
 import uuid # use uuid for generating an hex id for the address
 import hashlib
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from db import get_db, query_db
+from db import get_db, query_db, format_request_desc, parse_request_desc, HELPDESK_TEAM_EMAIL
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -43,6 +43,11 @@ def login():
 
         available_roles = get_user_roles(email)
 
+        if not available_roles:
+            # Role-less account - direct to Pending User flow to submit a role request.
+            session['available_roles'] = []
+            return redirect(url_for('auth.pending_user'))
+
         if len(available_roles) == 1:
             role = available_roles[0]
             session['roles'] = available_roles
@@ -78,6 +83,142 @@ def set_role(role):
         else:
             return redirect(url_for(f'{role}.welcome'))
     return redirect(url_for('auth.login'))
+
+@auth_bp.route('/pending_user', methods=['GET', 'POST'])
+def pending_user():
+    # Guard: require an authenticated session.
+    if 'email' not in session:
+        return redirect(url_for('auth.login'))
+
+    email = session['email']
+
+    # Guard: if user already has any role, they should not be on this page.
+    current_roles = get_user_roles(email)
+    if current_roles:
+        flash('You already have a role.')
+        return redirect(url_for('auth.login'))
+
+    db = get_db()
+
+    # Find the most recent PendingRole request (if any) for this user.
+    last_request = query_db(
+        'SELECT * FROM Requests '
+        'WHERE sender_email = ? AND request_type = ? '
+        'ORDER BY request_id DESC LIMIT 1',
+        [email, 'PendingRole'], one=True)
+
+    # Any currently-open pending request (status=0) blocks new submissions.
+    open_request = None
+    if last_request is not None and last_request['request_status'] == 0:
+        open_request = last_request
+
+    if request.method == 'POST':
+        # Block if already-open pending request.
+        if open_request is not None:
+            flash('You already have a pending role request.')
+            parsed = parse_request_desc(open_request['request_desc'])
+            return render_template(
+                'auth/pending_user.html',
+                status='pending',
+                last_request=open_request,
+                requested_role=parsed.get('requested_role'),
+                prefill={},
+            )
+
+        requested_role = (request.form.get('requested_role') or '').strip().lower()
+        if requested_role not in ('bidder', 'seller'):
+            flash('Please select a valid role (bidder or seller).')
+            # Decide render state based on prior history.
+            if last_request is not None and last_request['request_status'] == 2:
+                status = 'denied'
+            else:
+                status = 'new'
+            return render_template(
+                'auth/pending_user.html',
+                status=status,
+                last_request=last_request,
+                requested_role=None,
+                prefill=request.form.to_dict(),
+            )
+
+        # Required field set per role - mirrors register_form() for consistency.
+        required = [
+            'first_name', 'last_name', 'age', 'major', 'phone',
+            'street_num', 'street_name', 'zipcode', 'city', 'state',
+            'credit_card_num', 'card_type', 'expire_month', 'expire_year',
+            'security_code',
+        ]
+        if requested_role == 'seller':
+            required = required + ['bank_routing_num', 'bank_account_num']
+
+        missing = [f for f in required if not (request.form.get(f) or '').strip()]
+        if missing:
+            flash('Please fill in all required fields: ' + ', '.join(missing))
+            if last_request is not None and last_request['request_status'] == 2:
+                status = 'denied'
+            else:
+                status = 'new'
+            return render_template(
+                'auth/pending_user.html',
+                status=status,
+                last_request=last_request,
+                requested_role=None,
+                prefill=request.form.to_dict(),
+            )
+
+        # Build payload fields (always personal+address+cc; bank only for seller).
+        payload = {'requested_role': requested_role}
+        for f in (
+            'first_name', 'last_name', 'age', 'major', 'phone',
+            'street_num', 'street_name', 'zipcode', 'city', 'state',
+            'credit_card_num', 'card_type', 'expire_month', 'expire_year',
+            'security_code',
+        ):
+            payload[f] = request.form.get(f, '').strip()
+        if requested_role == 'seller':
+            payload['bank_routing_num'] = request.form.get('bank_routing_num', '').strip()
+            payload['bank_account_num'] = request.form.get('bank_account_num', '').strip()
+
+        # Compute next request_id via MAX+1 (same pattern as seller.request_category).
+        cur_id = query_db('SELECT MAX(request_id) AS cur_id FROM Requests', one=True)
+        next_id = (cur_id['cur_id'] or 0) + 1
+
+        db.execute(
+            'INSERT INTO Requests '
+            '(request_id, sender_email, helpdesk_staff_email, request_type, request_desc, request_status) '
+            'VALUES (?, ?, ?, ?, ?, ?)',
+            [next_id, email, HELPDESK_TEAM_EMAIL, 'PendingRole',
+             format_request_desc(**payload), 0])
+        db.commit()
+
+        flash('Role request submitted. A HelpDesk staff member will review it.')
+        return redirect(url_for('auth.pending_user'))
+
+    # GET: decide which state to render.
+    if open_request is not None:
+        parsed = parse_request_desc(open_request['request_desc'])
+        return render_template(
+            'auth/pending_user.html',
+            status='pending',
+            last_request=open_request,
+            requested_role=parsed.get('requested_role'),
+            prefill={},
+        )
+    if last_request is not None and last_request['request_status'] == 2:
+        return render_template(
+            'auth/pending_user.html',
+            status='denied',
+            last_request=last_request,
+            requested_role=None,
+            prefill={},
+        )
+    return render_template(
+        'auth/pending_user.html',
+        status='new',
+        last_request=None,
+        requested_role=None,
+        prefill={},
+    )
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
@@ -140,6 +281,9 @@ def register_form(role):
             expire_month = request.form['expire_month']
             expire_year = request.form['expire_year']
             security_code = request.form['security_code']
+            if query_db('SELECT 1 FROM Credit_Cards WHERE credit_card_num = ?', [credit_card_num], one=True):
+                flash('Cards cannot be shared across accounts — this card is already registered to another user.')
+                return render_template('auth/register_form.html', role=role)
             try:
                 # the order of insert into matters, as we want don;t want an integrity error
                 db.execute('INSERT INTO Users (email, password) VALUES (?, ?)', [email, hashed_pswd])
@@ -192,6 +336,9 @@ def register_form(role):
             expire_month = request.form['expire_month']
             expire_year = request.form['expire_year']
             security_code = request.form['security_code']
+            if query_db('SELECT 1 FROM Credit_Cards WHERE credit_card_num = ?', [credit_card_num], one=True):
+                flash('Cards cannot be shared across accounts — this card is already registered to another user.')
+                return render_template('auth/register_form.html', role=role)
             try:
                 # the order of insert into matters, as we want don;t want an integrity error
                 db.execute('INSERT INTO Users (email, password) VALUES (?, ?)', [email, hashed_pswd])
@@ -329,18 +476,28 @@ def profile():
                 flash('Incorrect current password.', 'danger')
 
         elif form_type == 'add_card':
-            credit_card_num = request.form.get('credit_card_num')
-            card_type = request.form.get('card_type')
+            credit_card_num = (request.form.get('credit_card_num') or '').strip()
+            card_type = (request.form.get('card_type') or '').strip()
             expire_month = request.form.get('expire_month')
             expire_year = request.form.get('expire_year')
-            security_code = request.form.get('security_code')
+            security_code = (request.form.get('security_code') or '').strip()
 
-            db.execute('''
-                INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email) 
-                VALUES (?, ?, ?, ?, ?, ?)''',
-                [credit_card_num, card_type, expire_month, expire_year, security_code, user_email])
-            db.commit()
-            flash('Card added successfully!', 'success')
+            mine = query_db(
+                'SELECT 1 FROM Credit_Cards WHERE credit_card_num = ? AND Owner_email = ?',
+                [credit_card_num, user_email], one=True,
+            )
+            if mine:
+                flash('You already have that card on your account.', 'danger')
+            else:
+                try:
+                    db.execute('''
+                        INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email)
+                        VALUES (?, ?, ?, ?, ?, ?)''',
+                        [credit_card_num, card_type, expire_month, expire_year, security_code, user_email])
+                    db.commit()
+                    flash('Card added successfully!', 'success')
+                except sql.IntegrityError:
+                    flash('Cards cannot be shared across accounts — this card is already registered to another user.', 'danger')
 
         elif form_type == 'remove_card':
             # BR-22: scope the DELETE to the session owner so a crafted form

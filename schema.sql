@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS Requests (
     request_type TEXT NOT NULL,
     request_desc TEXT,
     request_status INTEGER DEFAULT 0, -- we want the initial status of requests to be 0, meaning no request
+    response_comment TEXT, -- helpdesk staff's note at approve/deny time (reason, approval remark, etc.)
+    response_at TIMESTAMP, -- when the request was resolved (approved or denied)
     PRIMARY KEY (request_id),
     FOREIGN KEY (sender_email) REFERENCES Users(email),
     FOREIGN KEY (helpdesk_staff_email) REFERENCES Helpdesk(email)
@@ -138,13 +140,21 @@ CREATE TABLE IF NOT EXISTS Transactions (
 CREATE TABLE IF NOT EXISTS Rating (
     Bidder_Email TEXT NOT NULL,
     Seller_Email TEXT NOT NULL,
+    Listing_ID INTEGER, -- nullable so legacy seed rows (no per-listing anchor) still load
     Date TEXT NOT NULL,
     Rating INTEGER NOT NULL CHECK(Rating >= 1 AND Rating <= 5),
     Rating_Desc TEXT,
     PRIMARY KEY (Bidder_Email, Seller_Email, Date),
     FOREIGN KEY (Bidder_Email) REFERENCES Bidders(email),
-    FOREIGN KEY (Seller_Email) REFERENCES Sellers(email)
+    FOREIGN KEY (Seller_Email) REFERENCES Sellers(email),
+    FOREIGN KEY (Seller_Email, Listing_ID) REFERENCES Auction_Listings(Seller_Email, Listing_ID)
 );
+
+-- BR-15: at most one rating per (bidder, seller, completed auction).
+-- Partial index so seed rows with NULL Listing_ID are exempt.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rating_unique_per_listing
+    ON Rating(Bidder_Email, Seller_Email, Listing_ID)
+    WHERE Listing_ID IS NOT NULL;
 
 -- Team Phase 1 new feature: Product Q&A
 CREATE TABLE IF NOT EXISTS Questions (

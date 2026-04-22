@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
-<h3>Rate Seller</h3>
 <div class="row justify-content-center">
     <div class="col-md-7">
         <h2 class="mb-1">Rate the Seller</h2>
+        <p class="text-muted">
+            Auction: <strong>{{ listing.Auction_Title }}</strong><br>
+            Seller: <span class="small">{{ seller_email }}</span>
+        </p>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% for category, msg in messages %}
@@ -13,8 +16,8 @@
 
         {% if already_rated %}
         <div class="alert alert-success mt-3">
-            <strong>You have already rated this seller.</strong>
-            <a href="{{ url_for('bidder.welcome') }}" class="alert-link">Back to Home</a>.
+            <strong>You have already rated this seller for this auction.</strong>
+            <a href="{{ url_for('bidder.auction_history') }}" class="alert-link">Back to Auction History</a>.
         </div>
 
         {% else %}
@@ -24,16 +27,16 @@
                 <div class="col-md-6 mb-3">
                     <input type="radio" id="one" name="choice" value="1">
                     <label for="one">1</label>
-                    
+
                     <input type="radio" id="two" name="choice" value="2">
                     <label for="two">2</label>
-                    
+
                     <input type="radio" id="three" name="choice" value="3">
                     <label for="three">3</label>
-                    
+
                     <input type="radio" id="four" name="choice" value="4">
                     <label for="four">4</label>
-                    
+
                     <input type="radio" id="five" name="choice" value="5" checked>
                     <label for="five">5</label>
                 </div>
@@ -46,7 +49,7 @@
             </div>
 
             <button class="btn btn-primary">Submit Rating</button>
-            <a href="{{ url_for('bidder.welcome') }}" class="btn btn-outline-secondary ms-1">Cancel</a>
+            <a href="{{ url_for('bidder.auction_history') }}" class="btn btn-outline-secondary ms-1">Cancel</a>
         </form>
         {% endif %}
     </div>
