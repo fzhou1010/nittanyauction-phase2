@@ -9,15 +9,25 @@
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-    <div class="container">
+    <div class="container position-relative">
         <a class="navbar-brand" href="/">NittanyAuction</a>
         {% if session.get('email') %}
+        {% if 'bidder' in session.get('roles', []) %}
+        <div class="navbar-nav position-absolute top-50 start-50 translate-middle flex-row gap-3 d-none d-lg-flex">
+            <a class="nav-link" href="{{ url_for('listings.browse') }}"><i class="bi bi-search me-1"></i>Browse</a>
+            <a class="nav-link" href="{{ url_for('bidder.auction_history') }}"><i class="bi bi-clock-history me-1"></i>History</a>
+            <a class="nav-link" href="{{ url_for('bidder.shopping_cart') }}"><i class="bi bi-cart me-1"></i>Cart</a>
+        </div>
+        {% endif %}
         <div class="navbar-nav ms-auto align-items-lg-center">
-            <!-- local vendors shouldnt be able to browse -->
-            {% if 'bidder' in session.get('roles', []) %} <!-- this is because student sellers are also bidders by default -->
-            <a class="nav-link" href="{{ url_for('listings.browse') }}">Browse</a>
+            {% if 'bidder' in session.get('roles', []) %}
+            <div class="d-lg-none">
+                <a class="nav-link" href="{{ url_for('listings.browse') }}">Browse</a>
+                <a class="nav-link" href="{{ url_for('bidder.auction_history') }}">History</a>
+                <a class="nav-link" href="{{ url_for('bidder.shopping_cart') }}">Cart</a>
+            </div>
             {% endif %}
-            <div class="nav-item dropdown">
+            <div class="nav-item dropdown me-2">
                 <a class="nav-link position-relative" href="#" id="notifDropdown" role="button"
                    data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications">
                     <i class="bi bi-bell-fill"></i>
@@ -30,23 +40,28 @@
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notifDropdown"
                     style="min-width: 320px; max-width: 360px;">
-                    <li class="dropdown-header d-flex justify-content-between align-items-center">
-                        <span>Notifications</span>
-                        {% if nav_unread_count and nav_unread_count > 0 %}
+                    {% if nav_unread_count and nav_unread_count > 0 %}
+                    <li class="dropdown-header d-flex justify-content-center align-items-center">
                         <form method="post" action="{{ url_for('notifications.mark_read') }}"
                               class="m-0">
                             <input type="hidden" name="next" value="{{ request.path }}">
                             <button type="submit" class="btn btn-link btn-sm p-0">Mark all read</button>
                         </form>
-                        {% endif %}
                     </li>
                     <li><hr class="dropdown-divider"></li>
+                    {% endif %}
                     {% if not nav_recent_notifications %}
-                    <li><span class="dropdown-item-text text-muted small">No notifications yet.</span></li>
+                    <li><span class="dropdown-item-text text-muted small text-center">No notifications yet.</span></li>
                     {% else %}
                         {% for n in nav_recent_notifications %}
                         <li>
-                            {% if n.seller_email and n.listing_id %}
+                            {% if n.notif_type == 'rating_available' %}
+                            <a class="dropdown-item text-wrap small {% if not n.is_read %}fw-bold{% endif %}"
+                               href="{{ url_for('bidder.auction_history') }}">
+                                {{ n.message }}
+                                <div class="text-muted small fw-normal">{{ n.created_at }}</div>
+                            </a>
+                            {% elif n.seller_email and n.listing_id %}
                             <a class="dropdown-item text-wrap small {% if not n.is_read %}fw-bold{% endif %}"
                                href="{{ url_for('listings.detail', seller_email=n.seller_email, listing_id=n.listing_id) }}">
                                 {{ n.message }}
@@ -89,6 +104,9 @@
 {% block scripts %}{% endblock %}
 </body>
 <style>
+    html {
+        overflow-y: scroll;
+    }
     .nav-link:hover{
         text-decoration: underline !important
     }

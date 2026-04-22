@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from db import get_db, query_db
+from notifications import notify
 
 seller_bp = Blueprint('seller', __name__)
 
@@ -20,33 +21,37 @@ def dashboard():
     email = session['email']
     bal = query_db('SELECT balance from Sellers WHERE email = ?', [email], one=True)
     bal = bal or {'balance': 0.00} # if bal is none, default to 0 balance
+    balance_num = float(bal['balance'] or 0)
 
     has_card = query_db('SELECT 1 FROM Credit_Cards WHERE Owner_email = ?', [email], one=True) is not None
+    # Seller subtype drives which payment methods the promotion dialog exposes:
+    # local vendors can't own CCs (schema 3.5) so they must use balance; student
+    # sellers (also in Bidders) may choose either.
+    is_vendor = query_db('SELECT 1 FROM Local_Vendors WHERE email = ?', [email], one=True) is not None
+    is_bidder = query_db('SELECT 1 FROM Bidders WHERE email = ?', [email], one=True) is not None
     
-    #we also want to show the active current active listings of the seller along with some details
-    active_listings = query_db('''SELECT l.Listing_ID, l.Auction_Title, l.Product_Name, l.Category, l.Reserve_Price, l.Max_bids, l.is_promoted
-        FROM Auction_Listings l 
-        WHERE l.Seller_Email = ? AND Status = 1''', [email]) # use triple quotes instead to fix bug of wrapping
-        
-    
+    # Active listings + per-listing bid stats in a single query via the Listing_Bid_Stats view.
+    # LEFT JOIN so listings with zero bids still appear.
+    active_listings = query_db('''SELECT l.Listing_ID, l.Auction_Title, l.Product_Name, l.Category, l.Reserve_Price, l.Max_bids, l.is_promoted,
+               COALESCE(s.Bid_Count, 0) AS bid_count,
+               s.Current_Bid AS highest_bid
+        FROM Auction_Listings l
+        LEFT JOIN Listing_Bid_Stats s
+          ON s.Seller_Email = l.Seller_Email AND s.Listing_ID = l.Listing_ID
+        WHERE l.Seller_Email = ? AND l.Status = 1''', [email])
 
-    #query the specific detail of each active listing
     active_listing_details = []
-    for listing in active_listings: #for each listing in the active listings, we also want to get the current bidding history
-        bidding_information = query_db("""SELECT COUNT (*) AS bid_count, MAX(b.Bid_Price) as highest_bid
-                                         FROM bids b
-                                         WHERE b.Seller_Email = ? AND Listing_ID = ?""", [email, listing['Listing_ID']], one=True) #we nned this to be true as this returns a single row
-        # append an object with key-value pairs with the details to the list 
+    for listing in active_listings:
         active_listing_details.append({
             'Listing_ID': listing["Listing_ID"],
-            'Auction_Title': listing['Auction_Title'],     
-            'Product_Name': listing['Product_Name'],       
-            'Category': listing['Category'],               
-            'Reserve_Price': listing['Reserve_Price'],     
-            'Max_bids': listing['Max_bids'],               
-            'bid_count': bidding_information['bid_count'],            
-            'highest_bid': bidding_information['highest_bid'],
-            'is_promoted': listing['is_promoted'] or 0 # default to 0 if is_promoted is None
+            'Auction_Title': listing['Auction_Title'],
+            'Product_Name': listing['Product_Name'],
+            'Category': listing['Category'],
+            'Reserve_Price': listing['Reserve_Price'],
+            'Max_bids': listing['Max_bids'],
+            'bid_count': listing['bid_count'],
+            'highest_bid': listing['highest_bid'],
+            'is_promoted': listing['is_promoted'] or 0
         })
 
     #also want to retrieve sold listings for the specific seller, along with transaction status
@@ -79,19 +84,27 @@ def dashboard():
     q_count = query_db('''SELECT COUNT (*) as q_count
                        FROM Questions
                        WHERE Seller_Email = ? AND answered = 0''', [email], one=True)
-    # get the average rating of the seller from the rating table
-    seller_rating = query_db('''SELECT AVG(Rating) AS avg_rating, COUNT(*) AS count
-                             FROM Rating
+    # get the average rating of the seller via the Seller_Avg_Rating view
+    seller_rating = query_db('''SELECT Avg_Rating AS avg_rating, Rating_Count AS count
+                             FROM Seller_Avg_Rating
                              WHERE Seller_Email = ?''', [email], one=True)
+    # view returns no row when the seller has zero ratings; preserve the {avg_rating, count} shape
+    if not seller_rating:
+        seller_rating = {'avg_rating': None, 'count': 0}
     
     return render_template('seller/dashboard.html', bal=bal, active_listings=active_listing_details, sold_listings=sold_listings_details,
-                           q_count=q_count, seller_rating=seller_rating, inactive_listings=inactive_listings, has_card=has_card)
+                           q_count=q_count, seller_rating=seller_rating, inactive_listings=inactive_listings,
+                           has_card=has_card, is_vendor=is_vendor, is_bidder=is_bidder, balance_num=balance_num)
 
 # Initial Step of Creating a Listing, Selecting a Category
 @seller_bp.route('/list_product', methods=['GET', 'POST'])
 def list_product():
-    # render the category selection for listing a product
-    categories = query_db('SELECT category_name FROM Categories ORDER BY category_name')
+    # BR-18: only leaf categories hold products — exclude any category that is someone's parent.
+    categories = query_db('''
+        SELECT category_name FROM Categories
+        WHERE category_name NOT IN (SELECT DISTINCT parent_category FROM Categories WHERE parent_category IS NOT NULL)
+        ORDER BY category_name
+    ''')
 
     if request.method == 'POST':
         category = request.form.get('category')
@@ -199,17 +212,24 @@ def list_product_review():
 @seller_bp.route('/edit_listing/<int:lid>', methods=['GET', 'POST'])
 def edit_listing(lid): #should pass in the listing id
     email = session['email']
-    #get the categories to pass in
-    categories = query_db('SELECT category_name FROM Categories ORDER BY category_name')
     #get the current listing, should be seller email and listing id
     cur_listing = query_db('''SELECT Listing_ID, Auction_Title, Product_Name, Product_Description, Category, Reserve_Price, Max_bids, Condition, Quantity, Status
         FROM Auction_Listings
         WHERE Seller_Email = ? AND Listing_ID = ?''', [email, lid], one=True) #should be one row
-    
+
     #if the current listing is not found
     if not cur_listing:
         flash('There has been an error, listing not found')
         return redirect(url_for('seller.dashboard'))
+
+    # BR-18: only leaf categories hold products. Include the listing's current category
+    # as an OR branch so legacy listings filed under a now-non-leaf category still render.
+    categories = query_db('''
+        SELECT category_name FROM Categories
+        WHERE category_name NOT IN (SELECT DISTINCT parent_category FROM Categories WHERE parent_category IS NOT NULL)
+           OR category_name = ?
+        ORDER BY category_name
+    ''', [cur_listing['Category']])
 
     # sold or inactive listings cannot be edited
     if cur_listing['Status'] != 1:
@@ -309,7 +329,7 @@ def questions():
         FROM Questions Q, Auction_Listings l
         WHERE l.Seller_Email = ? AND q.Seller_Email = l.Seller_Email AND q.Listing_ID = l.Listing_ID AND q.answered = 0''', [email])
 
-    answered_questions = query_db('''SELECT q.question_id, q.Listing_Id, q.bidder_email, q.question_text, q.answer_text, q.answered, q.question_time, l.Auction_Title, l.Listing_ID
+    answered_questions = query_db('''SELECT q.question_id, q.Listing_Id, q.bidder_email, q.question_text, q.answer_text, q.answered, q.question_time, q.answer_time, l.Auction_Title, l.Listing_ID
         FROM Questions Q, Auction_Listings l
         WHERE l.Seller_Email = ? AND q.Seller_Email = l.Seller_Email AND q.Listing_ID = l.Listing_ID AND q.answered = 1''', [email])
     
@@ -328,8 +348,8 @@ def questions():
 def question(qid):
     # receiving the question answer from the seller regarding the listing
     email = session['email']
-    question = query_db('''SELECT q.question_id, q.Listing_ID, q.Bidder_Email, q.question_text, q.answer_text, q.answered, q.question_time, l.Auction_Title
-                            FROM Questions q, Auction_Listings l                                           
+    question = query_db('''SELECT q.question_id, q.Listing_ID, q.Bidder_Email, q.question_text, q.answer_text, q.answered, q.question_time, q.answer_time, l.Auction_Title
+                            FROM Questions q, Auction_Listings l
                             WHERE q.Seller_Email = l.Seller_Email AND q.Listing_ID = l.Listing_ID AND q.question_id = ? AND q.Seller_Email = ?''',
                           [qid, email], one=True) # returns one row of data per question
     #get the answer response from the form and save
@@ -340,9 +360,14 @@ def question(qid):
             return redirect(url_for('seller.question', qid=qid))
         #update the answer text for the question
         db = get_db()
-        db.execute('''UPDATE Questions SET answer_text = ?, answered = 1
+        db.execute('''UPDATE Questions SET answer_text = ?, answered = 1, answer_time = CURRENT_TIMESTAMP
                     WHERE question_id = ? AND Seller_Email = ?
                     ''', [answer_text, qid, email])
+        notify(
+            question['Bidder_Email'], 'question_answered',
+            f'Your question on "{question["Auction_Title"]}" has been answered.',
+            seller_email=email, listing_id=question['Listing_ID'],
+        )
         db.commit()
         flash('Answer has been recorded')
         #return to the same question page for the seller to view the entire log
@@ -429,38 +454,62 @@ def request_category():
 @seller_bp.route('/promote/<int:listing_id>', methods=['POST'])
 def promote_listing(listing_id):
     email = session['email']
+    # payment_method: 'balance' (all sellers) or 'card' (student sellers / dual-role only).
+    # Local vendors are forced to 'balance' regardless of what the form sends.
+    payment_method = (request.form.get('payment_method') or '').strip().lower()
 
-    card = query_db('SELECT 1 FROM Credit_Cards WHERE Owner_email = ?', [email], one=True)
-
-    if not card:
-        flash('You must have a credit card on file to promote a listing.', 'danger')
-        return redirect(url_for('seller.dashboard'))
-    
-    listing = query_db('''SELECT * FROM Auction_Listings 
-                         WHERE Seller_Email = ? AND Listing_ID = ?''', 
+    listing = query_db('''SELECT * FROM Auction_Listings
+                         WHERE Seller_Email = ? AND Listing_ID = ?''',
                          [email, listing_id], one=True)
-    
     if not listing:
         flash('Listing not found.', 'danger')
         return redirect(url_for('seller.dashboard'))
-    
     if listing['is_promoted']:
         flash('This listing is already promoted.', 'warning')
         return redirect(url_for('seller.dashboard'))
-
     if listing['Status'] != 1:
         flash('Only active listings can be promoted.', 'danger')
         return redirect(url_for('seller.dashboard'))
 
-    promotion_fee = round(listing['Reserve_Price'] * 0.05, 2)
+    is_vendor = query_db('SELECT 1 FROM Local_Vendors WHERE email = ?', [email], one=True) is not None
+    is_bidder = query_db('SELECT 1 FROM Bidders WHERE email = ?', [email], one=True) is not None
 
+    # Vendors can't own CCs per schema 3.5, so force balance even if the form was tampered with.
+    if is_vendor and not is_bidder:
+        payment_method = 'balance'
+    if payment_method not in ('balance', 'card'):
+        flash('Please choose a payment method to promote this listing.', 'danger')
+        return redirect(url_for('seller.dashboard'))
+
+    promotion_fee = round(listing['Reserve_Price'] * 0.05, 2)
     db = get_db()
-    db.execute('''UPDATE Auction_Listings 
+
+    if payment_method == 'balance':
+        bal_row = query_db('SELECT balance FROM Sellers WHERE email = ?', [email], one=True)
+        current_balance = float(bal_row['balance'] or 0) if bal_row else 0.0
+        if current_balance < promotion_fee:
+            flash(
+                f'Insufficient balance to promote. Fee is ${promotion_fee:.2f} but your balance is ${current_balance:.2f}.',
+                'danger',
+            )
+            return redirect(url_for('seller.dashboard'))
+        db.execute('UPDATE Sellers SET balance = balance - ? WHERE email = ?',
+                   [promotion_fee, email])
+    else:  # payment_method == 'card'
+        if not is_bidder:
+            flash('Credit card payment is only available to sellers who are also bidders.', 'danger')
+            return redirect(url_for('seller.dashboard'))
+        has_card = query_db('SELECT 1 FROM Credit_Cards WHERE Owner_email = ?', [email], one=True)
+        if not has_card:
+            flash('You must have a credit card on file to pay by card. Add one in your profile.', 'danger')
+            return redirect(url_for('seller.dashboard'))
+
+    db.execute('''UPDATE Auction_Listings
                   SET is_promoted = 1, promotion_fee = ?, promotion_time = CURRENT_TIMESTAMP
                   WHERE Seller_Email = ? AND Listing_ID = ?''',
                   [promotion_fee, email, listing_id])
-
     db.commit()
 
-    flash(f'Listing promoted! A fee of ${promotion_fee} has been charged.', 'success')
+    method_label = 'balance' if payment_method == 'balance' else 'credit card'
+    flash(f'Listing promoted! A fee of ${promotion_fee:.2f} was charged to your {method_label}.', 'success')
     return redirect(url_for('seller.dashboard'))

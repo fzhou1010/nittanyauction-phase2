@@ -1,3 +1,5 @@
+from datetime import date
+
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from db import get_db, query_db, format_request_desc, HELPDESK_TEAM_EMAIL
 
@@ -26,14 +28,17 @@ def shopping_cart():
         SELECT
             c.Seller_Email, c.Listing_ID, c.added_at,
             al.Auction_Title, al.Product_Name, al.Category,
-            al.Max_bids, al.Reserve_Price, al.Status,
-            (SELECT MAX(Bid_Price) FROM Bids b
-                WHERE b.Seller_Email = c.Seller_Email AND b.Listing_ID = c.Listing_ID) AS current_bid,
-            (SELECT COUNT(*) FROM Bids b
-                WHERE b.Seller_Email = c.Seller_Email AND b.Listing_ID = c.Listing_ID) AS bid_count
+            al.Max_bids, al.Status,
+            s.Current_Bid AS current_bid,
+            COALESCE(s.Bid_Count, 0) AS bid_count,
+            sar.Avg_Rating, sar.Rating_Count
         FROM Shopping_Cart c
         JOIN Auction_Listings al
           ON al.Seller_Email = c.Seller_Email AND al.Listing_ID = c.Listing_ID
+        LEFT JOIN Listing_Bid_Stats s
+          ON s.Seller_Email = c.Seller_Email AND s.Listing_ID = c.Listing_ID
+        LEFT JOIN Seller_Avg_Rating sar
+          ON sar.Seller_Email = c.Seller_Email
         WHERE c.Bidder_Email = ?
         ORDER BY c.added_at DESC
         ''',
@@ -53,7 +58,8 @@ def shopping_cart():
             'remaining_bids': max(r['Max_bids'] - bid_count, 0) if r['Max_bids'] else 0,
             'status': r['Status'],
             'status_label': STATUS_LABELS.get(r['Status'], 'Unknown'),
-            'reserve_price': r['Reserve_Price'],
+            'avg_rating': r['Avg_Rating'],
+            'rating_count': r['Rating_Count'],
         })
 
     return render_template('bidder/shopping_cart.html', items=items)
@@ -111,14 +117,22 @@ def auction_history():
     email = session['email']
 
     # Won auctions: closed listings where this bidder had the highest bid and it met reserve.
-    won = query_db(
+    # `already_rated` lets the template show "Rate Seller" only when BR-14 (paid) is met
+    # AND BR-15 (no prior rating for this completed auction) hasn't already been recorded.
+    won_rows = query_db(
         '''
         SELECT
             al.Seller_Email, al.Listing_ID, al.Auction_Title, al.Product_Name,
             al.Category, al.Reserve_Price, al.Status,
             (SELECT MAX(Bid_Price) FROM Bids b
                 WHERE b.Seller_Email = al.Seller_Email AND b.Listing_ID = al.Listing_ID) AS winning_bid,
-            t.Date AS sold_date, t.Payment
+            t.Date AS sold_date, t.Payment,
+            EXISTS(
+                SELECT 1 FROM Rating r
+                WHERE r.Bidder_Email = ?
+                  AND r.Seller_Email = al.Seller_Email
+                  AND r.Listing_ID  = al.Listing_ID
+            ) AS already_rated
         FROM Auction_Listings al
         LEFT JOIN Transactions t
             ON t.Seller_Email = al.Seller_Email
@@ -135,8 +149,11 @@ def auction_history():
               >= COALESCE(al.Reserve_Price, 0)
         ORDER BY COALESCE(t.Date, '') DESC, al.Listing_ID DESC
         ''',
-        [email, email],
+        [email, email, email],
     )
+    won = [dict(r) for r in won_rows]
+    for w in won:
+        w['can_rate'] = bool(w['Payment']) and not w['already_rated']
 
     # Bid history: one row per listing the bidder has touched, with their top bid vs the current leader.
     bids = query_db(
@@ -173,39 +190,79 @@ def auction_history():
 
     return render_template('bidder/auction_history.html', won=won, bids=bid_rows)
 
-@bidder_bp.route('/rate/<seller_email>', methods=['GET', 'POST'])
-def rate_seller(seller_email):
-    email = session["email"]
+@bidder_bp.route('/rate/<seller_email>/<int:listing_id>', methods=['GET', 'POST'])
+def rate_seller(seller_email, listing_id):
+    email = session['email']
 
-    already_rated = query_db(
-        "SELECT 1 FROM Rating WHERE Bidder_Email = ? AND Seller_Email = ?", [email, seller_email], one=True
+    # Role gate: only registered bidders can rate. Without this, a helpdesk-only
+    # account could POST and trip the Bidders FK from the wrong layer.
+    if not query_db('SELECT 1 FROM Bidders WHERE email = ?', [email], one=True):
+        flash('Only bidders can rate sellers.', 'danger')
+        return redirect(url_for('listings.browse'))
+
+    listing = query_db(
+        'SELECT Auction_Title, Status FROM Auction_Listings '
+        'WHERE Seller_Email = ? AND Listing_ID = ?',
+        [seller_email, listing_id], one=True,
     )
-    
-    if request.method == "POST":
+    if not listing:
+        flash('Listing not found.', 'danger')
+        return redirect(url_for('bidder.auction_history'))
+
+    # BR-14: rating requires a completed, paid transaction by this bidder.
+    transaction = query_db(
+        'SELECT 1 FROM Transactions '
+        'WHERE Seller_Email = ? AND Listing_ID = ? AND Bidder_Email = ?',
+        [seller_email, listing_id, email], one=True,
+    )
+    if not transaction:
+        flash('You can only rate a seller after winning and paying for one of their auctions.', 'warning')
+        return redirect(url_for('bidder.auction_history'))
+
+    # BR-15: at most one rating per completed auction. Schema also enforces this
+    # via a partial unique index, but the early check gives a clean message.
+    existing_rating = query_db(
+        'SELECT Rating, Rating_Desc, Date FROM Rating '
+        'WHERE Bidder_Email = ? AND Seller_Email = ? AND Listing_ID = ?',
+        [email, seller_email, listing_id], one=True,
+    )
+    already_rated = existing_rating is not None
+
+    if request.method == 'POST':
         if already_rated:
-            flash('You have already reated this seller', 'warning')
-            return redirect(url_for('bidder/rate/<seller_email>'))
-        
-        rating = request.form.get('choice', '').strip()
-        description = request.form.get('note', '').strip()
-        
-        desc = format_request_desc(RATING=rating, DESCRIPTION=description)
+            flash('You have already rated this seller for this auction.', 'warning')
+            return redirect(url_for('bidder.auction_history'))
+
+        try:
+            rating_value = int(request.form.get('choice', '').strip())
+        except ValueError:
+            rating_value = 0
+        if rating_value < 1 or rating_value > 5:
+            flash('Please choose a rating between 1 and 5.', 'danger')
+            return redirect(url_for('bidder.rate_seller',
+                                    seller_email=seller_email, listing_id=listing_id))
+
+        description = request.form.get('note', '').strip() or None
 
         db = get_db()
         db.execute(
-            'INSERT INTO Rating (Bidder_Email, Seller_Email, '
-            '                      Date, Rating, Rating_Desc) '
-            'VALUES (?, ?, ?, ?, ?)',
-            [email, seller_email, "GETDATE()", rating, description],
+            'INSERT INTO Rating (Bidder_Email, Seller_Email, Listing_ID, Date, Rating, Rating_Desc) '
+            'VALUES (?, ?, ?, ?, ?, ?)',
+            [email, seller_email, listing_id, date.today().isoformat(), rating_value, description],
         )
         db.commit()
-        flash('Your review has been recieved. Thank you.', 'success')
-        return redirect(url_for('bidder.welcome'))
-        
+        flash('Your review has been received. Thank you.', 'success')
+        return redirect(url_for('bidder.auction_history'))
 
-    return render_template('bidder/rate_seller.html',
-                           already_rated = already_rated,
-                           form={})
+    return render_template(
+        'bidder/rate_seller.html',
+        seller_email=seller_email,
+        listing=listing,
+        listing_id=listing_id,
+        already_rated=already_rated,
+        existing_rating=existing_rating,
+        form={},
+    )
 
 @bidder_bp.route('/apply_seller', methods=['GET', 'POST'])
 def apply_seller():

@@ -120,6 +120,10 @@ def main():
         db.executescript(f.read())
     print('Schema created.')
 
+    # BR-18: seed the Root sentinel category so child rows' parent_category FK resolves.
+    # Categories.csv references parent_category='Root' but doesn't declare the Root row itself.
+    db.execute('INSERT OR IGNORE INTO Categories (category_name, parent_category) VALUES (?, ?)', ['Root', None])
+
     # Load each CSV into its corresponding table
     for filename, table, columns in LOAD_ORDER:
         count = load_csv(db, filename, table, columns)
@@ -131,7 +135,7 @@ def main():
     # logs in as this account — the password is an unusable placeholder.
     db.execute(
         'INSERT OR IGNORE INTO Users (email, password) VALUES (?, ?)',
-        [HELPDESK_TEAM_EMAIL, '!unassigned!'],
+        [HELPDESK_TEAM_EMAIL, hash_password('!unassigned!')],
     )
     db.execute(
         'INSERT OR IGNORE INTO Helpdesk (email, position) VALUES (?, ?)',

@@ -125,32 +125,55 @@ def browse():
 
 
 
-    # Flat search bypasses the hierarchy entirely
-    if search:
-        like = f'%{search}%'
-        search_where = '''
+    # Flat search bypasses the hierarchy entirely. Entering search mode when the
+    # user submits only a price filter (with no keyword) makes the price filter
+    # actually do something — otherwise the form submit bounced back to hierarchy
+    # mode and silently discarded the filter.
+    has_price_filter = price_min is not None or price_max is not None
+    if search or has_price_filter:
+        like = f'%{search}%' if search else '%'
+        # Price-range filter: COALESCE Current_Bid to 0 so listings that have received
+        # no bids yet (Current_Bid IS NULL) aren't silently dropped when the user sets
+        # a max. Without this, `NULL <= max` evaluates to NULL (falsy) and the ~95% of
+        # active listings that have no bids disappear the moment any filter is applied.
+        category_clause = ''
+        category_params = []
+        if category:
+            cats = get_all_subcategories(category)
+            ph = ','.join(['?'] * len(cats))
+            category_clause = f' AND Auction_Listings.Category IN ({ph})'
+            category_params = list(cats)
+        search_where = f'''
             WHERE Status = 1
               AND (Auction_Listings.Auction_Title LIKE ?
                     OR Auction_Listings.Product_Name LIKE ?
                     OR Auction_Listings.Product_Description LIKE ?
                     OR Auction_Listings.Category LIKE ?
+                    OR Auction_Listings.Seller_Email LIKE ?
                     OR bd.first_name LIKE ?
-                    OR bd.last_name LIKE ?)
+                    OR bd.last_name LIKE ?
+                    OR lv.business_name LIKE ?)
                 AND (
                     (? IS NULL AND ? IS NULL)
                 OR
-                    (Current_Bid <= COALESCE(?, 99999999) AND Current_Bid >= COALESCE(?, 0)))
+                    (COALESCE(Current_Bid, 0) <= COALESCE(?, 99999999)
+                     AND COALESCE(Current_Bid, 0) >= COALESCE(?, 0)))
+                {category_clause}
         '''
-        search_params = [like, like, like, like, like, like, price_max, price_min, price_max, price_min]
+        search_params = [like, like, like, like, like, like, like, like,
+                         price_max, price_min, price_max, price_min] + category_params
 
         promoted_listings = query_db(
             f'''
             SELECT Auction_Listings.*,
                 (SELECT MAX(Bid_Price) FROM Bids b
                  WHERE b.Seller_Email = Auction_Listings.Seller_Email
-                   AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
+                   AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid,
+                sar.Avg_Rating, sar.Rating_Count
             FROM Auction_Listings
-            JOIN Bidders bd ON Auction_Listings.Seller_Email = bd.email
+            LEFT JOIN Bidders bd ON Auction_Listings.Seller_Email = bd.email
+            LEFT JOIN Local_Vendors lv ON Auction_Listings.Seller_Email = lv.email
+            LEFT JOIN Seller_Avg_Rating sar ON sar.Seller_Email = Auction_Listings.Seller_Email
             {search_where}
               AND Auction_Listings.is_promoted = 1
             ORDER BY Auction_Listings.promotion_time DESC
@@ -164,9 +187,12 @@ def browse():
             SELECT Auction_Listings.*,
                 (SELECT MAX(Bid_Price) FROM Bids b
                  WHERE b.Seller_Email = Auction_Listings.Seller_Email
-                   AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
+                   AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid,
+                sar.Avg_Rating, sar.Rating_Count
             FROM Auction_Listings
-            JOIN Bidders bd ON Auction_Listings.Seller_Email = bd.email
+            LEFT JOIN Bidders bd ON Auction_Listings.Seller_Email = bd.email
+            LEFT JOIN Local_Vendors lv ON Auction_Listings.Seller_Email = lv.email
+            LEFT JOIN Seller_Avg_Rating sar ON sar.Seller_Email = Auction_Listings.Seller_Email
             {search_where}
             ''',
             search_params,
@@ -177,6 +203,7 @@ def browse():
             'listings/browse.html',
             mode='search', search=search, listings=listings,
             promoted_listings=promoted_listings,
+            current_category=category,
         )
 
     # Hierarchy mode: dynamically fetch subcategories of the current node
@@ -188,16 +215,20 @@ def browse():
 
     listings = []
     if category:
+        cats = get_all_subcategories(category)
+        placeholders = ','.join(['?'] * len(cats))
         listings = query_db(
-            '''
-            SELECT *,
+            f'''
+            SELECT Auction_Listings.*,
                 (SELECT MAX(Bid_Price) FROM Bids b
                  WHERE b.Seller_Email = Auction_Listings.Seller_Email
-                   AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
+                   AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid,
+                sar.Avg_Rating, sar.Rating_Count
             FROM Auction_Listings
-            WHERE Status = 1 AND Category = ? AND (is_promoted IS NULL OR is_promoted = 0)
+            LEFT JOIN Seller_Avg_Rating sar ON sar.Seller_Email = Auction_Listings.Seller_Email
+            WHERE Status = 1 AND Category IN ({placeholders}) AND (is_promoted IS NULL OR is_promoted = 0)
             ''',
-            [category],
+            cats,
         )
 
     # Walk parents to build breadcrumb (root → current)
@@ -213,11 +244,13 @@ def browse():
 
     if not category:
         promoted_listings = query_db('''
-            SELECT *,
+            SELECT Auction_Listings.*,
                 (SELECT MAX(Bid_Price) FROM Bids b
                 WHERE b.Seller_Email = Auction_Listings.Seller_Email
-                AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
-            FROM Auction_Listings 
+                AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid,
+                sar.Avg_Rating, sar.Rating_Count
+            FROM Auction_Listings
+            LEFT JOIN Seller_Avg_Rating sar ON sar.Seller_Email = Auction_Listings.Seller_Email
             WHERE is_promoted = 1 AND Status = 1
             ORDER BY promotion_time DESC
         ''')
@@ -225,12 +258,14 @@ def browse():
         all_cats = get_all_subcategories(category)
         placeholders = ','.join('?' * len(all_cats))
         promoted_listings = query_db(f'''
-            SELECT *,
+            SELECT Auction_Listings.*,
                 (SELECT MAX(Bid_Price) FROM Bids b
                 WHERE b.Seller_Email = Auction_Listings.Seller_Email
-                AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
-            FROM Auction_Listings 
-            WHERE is_promoted = 1 AND Status = 1 
+                AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid,
+                sar.Avg_Rating, sar.Rating_Count
+            FROM Auction_Listings
+            LEFT JOIN Seller_Avg_Rating sar ON sar.Seller_Email = Auction_Listings.Seller_Email
+            WHERE is_promoted = 1 AND Status = 1
             AND Category IN ({placeholders})
             ORDER BY promotion_time DESC
         ''', all_cats)
@@ -279,7 +314,7 @@ def detail(seller_email, listing_id):
         current_cat = parent['parent_category'] if parent and parent['parent_category'] != ROOT_PARENT else None
 
     questions = query_db('''
-        SELECT question_text, answer_text, Bidder_Email, Question_time
+        SELECT question_text, answer_text, Bidder_Email, Question_time, answer_time
         FROM Questions
         WHERE Seller_Email = ? AND Listing_ID = ?
         ORDER BY Question_time DESC
@@ -311,15 +346,32 @@ def detail(seller_email, listing_id):
         [session['email'], seller_email, listing_id], one=True,
     ) is not None
 
-    reviews = query_db(
+    review_rows = query_db(
         "SELECT * FROM Rating WHERE Seller_Email = ?",
         [seller_email]
     )
+    # Rating.Date is stored as TEXT in mixed formats (seed uses 'M/D/YY', our
+    # code writes ISO 'YYYY-MM-DD'), so ORDER BY Date sorts lexicographically
+    # and produces garbage. Parse in Python and sort newest-first for display.
+    from datetime import datetime
+    def _parse_rating_date(s):
+        if not s:
+            return datetime.min
+        for fmt in ('%Y-%m-%d', '%m/%d/%y', '%m/%d/%Y'):
+            try:
+                return datetime.strptime(str(s).strip(), fmt)
+            except ValueError:
+                continue
+        return datetime.min
+    reviews = sorted(review_rows, key=lambda r: _parse_rating_date(r['Date']), reverse=True)
 
     avg_rating = query_db(
-        "SELECT AVG(Rating) as Avg_Rating From Rating WHERE Seller_Email = ?",
+        "SELECT Avg_Rating FROM Seller_Avg_Rating WHERE Seller_Email = ?",
         [seller_email], one=True
     )
+    # view returns no row for unrated sellers; template checks avg_rating.Avg_Rating truthiness
+    if not avg_rating:
+        avg_rating = {'Avg_Rating': None}
 
     return render_template(
         'listings/detail.html',
@@ -477,6 +529,36 @@ def pay(seller_email, listing_id):
             'listings/payment.html', listing=listing, amount=amount, cards=cards,
         )
 
+    if request.form.get('form_type') == 'add_card':
+        credit_card_num = request.form.get('credit_card_num', '').strip()
+        card_type = request.form.get('card_type', '').strip()
+        expire_month = request.form.get('expire_month')
+        expire_year = request.form.get('expire_year')
+        security_code = request.form.get('security_code', '').strip()
+        if not (credit_card_num and card_type and expire_month and expire_year and security_code):
+            flash('Please fill out every card field.', 'danger')
+            return redirect(url_for('listings.pay', seller_email=seller_email, listing_id=listing_id))
+        mine = query_db(
+            'SELECT 1 FROM Credit_Cards WHERE credit_card_num = ? AND Owner_email = ?',
+            [credit_card_num, email], one=True,
+        )
+        if mine:
+            flash('You already have that card on your account.', 'danger')
+            return redirect(url_for('listings.pay', seller_email=seller_email, listing_id=listing_id))
+        import sqlite3
+        try:
+            db = get_db()
+            db.execute(
+                'INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email) '
+                'VALUES (?, ?, ?, ?, ?, ?)',
+                [credit_card_num, card_type, expire_month, expire_year, security_code, email],
+            )
+            db.commit()
+            flash('Card added.', 'success')
+        except sqlite3.IntegrityError:
+            flash('Cards cannot be shared across accounts — this card is already registered to another user.', 'danger')
+        return redirect(url_for('listings.pay', seller_email=seller_email, listing_id=listing_id))
+
     selected_card = request.form.get('credit_card_num', '').strip()
     valid_card = query_db(
         'SELECT 1 FROM Credit_Cards WHERE credit_card_num = ? AND Owner_email = ?',
@@ -501,5 +583,16 @@ def pay(seller_email, listing_id):
     )
     db.commit()
 
-    flash('Payment successful! Transaction recorded.')
+    # Nudge the buyer to leave a rating. Rating stays available in auction history
+    # for as long as they want — this notification exists so they discover it.
+    # notify() doesn't commit, so we follow it with an explicit commit.
+    title = listing['Auction_Title'] or listing['Product_Name'] or 'your purchase'
+    notify(
+        email, 'rating_available',
+        f'Thanks for your purchase! Rate {seller_email} for "{title}" in your Auction History whenever you\'re ready.',
+        seller_email, listing_id,
+    )
+    db.commit()
+
+    flash('Payment successful! You can rate the seller any time from your Auction History.')
     return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))

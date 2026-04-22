@@ -24,7 +24,11 @@
                         {% if not n.is_read %}<span class="badge bg-primary ms-2">New</span>{% endif %}
                     </div>
                     <div>
-                        {% if n.seller_email and n.listing_id %}
+                        {% if n.notif_type == 'rating_available' %}
+                            <a href="{{ url_for('bidder.auction_history') }}">
+                                {{ n.message }}
+                            </a>
+                        {% elif n.seller_email and n.listing_id %}
                             <a href="{{ url_for('listings.detail', seller_email=n.seller_email, listing_id=n.listing_id) }}">
                                 {{ n.message }}
                             </a>

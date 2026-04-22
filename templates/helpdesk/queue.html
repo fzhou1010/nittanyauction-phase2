@@ -47,7 +47,13 @@
                     <td>{{ r['request_id'] }}</td>
                     <td><span class="badge bg-info text-dark">{{ r['request_type'] }}</span></td>
                     <td>{{ r['sender_email'] }}</td>
-                    <td>{{ r['request_desc'] or '—' }}</td>
+                    <td>
+                        {% if r['request_type'] == 'PendingRole' %}
+                            Pending user role application
+                        {% else %}
+                            {{ r['request_desc'] or '—' }}
+                        {% endif %}
+                    </td>
                     <td>
                         <form method="post" action="{{ url_for('helpdesk.claim_request', rid=r['request_id']) }}">
                             <button class="btn btn-sm btn-outline-primary">Claim</button>
@@ -85,6 +91,35 @@
                     <dd class="col-sm-9">{{ r['parsed']['NOTE'] }}</dd>
                     {% endif %}
                 </dl>
+                {% elif r['request_type'] == 'PendingRole' %}
+                <dl class="row small mt-2 mb-3">
+                    <dt class="col-sm-3">Requested Role</dt>
+                    <dd class="col-sm-9">{{ r['parsed'].get('requested_role', '—')|capitalize }}</dd>
+                    <dt class="col-sm-3">Name</dt>
+                    <dd class="col-sm-9">{{ r['parsed'].get('first_name', '') }} {{ r['parsed'].get('last_name', '') }}</dd>
+                    <dt class="col-sm-3">Age</dt>
+                    <dd class="col-sm-9">{{ r['parsed'].get('age', '—') }}</dd>
+                    <dt class="col-sm-3">Major</dt>
+                    <dd class="col-sm-9">{{ r['parsed'].get('major', '—') }}</dd>
+                    <dt class="col-sm-3">Phone</dt>
+                    <dd class="col-sm-9">{{ r['parsed'].get('phone', '—') }}</dd>
+                    <dt class="col-sm-3">Address</dt>
+                    <dd class="col-sm-9">
+                        {{ r['parsed'].get('street_num', '') }} {{ r['parsed'].get('street_name', '') }},
+                        {{ r['parsed'].get('city', '') }}, {{ r['parsed'].get('state', '') }} {{ r['parsed'].get('zipcode', '') }}
+                    </dd>
+                    <dt class="col-sm-3">Card</dt>
+                    <dd class="col-sm-9">
+                        {{ r['parsed'].get('card_type', '—') }}
+                        <code>&middot;&middot;&middot;&middot; {{ r['parsed'].get('credit_card_num', '')[-4:] }}</code>
+                    </dd>
+                    {% if r['parsed'].get('requested_role') == 'seller' %}
+                    <dt class="col-sm-3">Bank Routing</dt>
+                    <dd class="col-sm-9"><code>{{ r['parsed'].get('bank_routing_num', '—') }}</code></dd>
+                    <dt class="col-sm-3">Bank Account</dt>
+                    <dd class="col-sm-9"><code>&middot;&middot;&middot;&middot; {{ r['parsed'].get('bank_account_num', '')[-4:] }}</code></dd>
+                    {% endif %}
+                </dl>
                 {% else %}
                 <p class="mt-2 mb-3">{{ r['request_desc'] or '—' }}</p>
                 {% endif %}
@@ -114,6 +149,10 @@
                     </div>
                     {% endif %}
 
+                    <div class="mb-2">
+                        <textarea class="form-control form-control-sm" name="response_comment" rows="2"
+                                  placeholder="Optional approval note / Required denial reason"></textarea>
+                    </div>
                     <button name="action" value="complete" class="btn btn-sm btn-success">Complete</button>
                     <button name="action" value="deny" class="btn btn-sm btn-outline-danger ms-1" formnovalidate>Deny</button>
                 </form>
@@ -143,7 +182,13 @@
                     <td>{{ r['request_id'] }}</td>
                     <td>{{ r['request_type'] }}</td>
                     <td>{{ r['sender_email'] }}</td>
-                    <td>{{ r['request_desc'] or '—' }}</td>
+                    <td>
+                        {% if r['request_type'] == 'PendingRole' %}
+                            Pending user role application
+                        {% else %}
+                            {{ r['request_desc'] or '—' }}
+                        {% endif %}
+                    </td>
                     <td>
                         {% if r['request_status'] == 1 %}
                         <span class="badge bg-success">Approved</span>
