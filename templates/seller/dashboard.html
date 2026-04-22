@@ -104,14 +104,21 @@
                                 </form>
                             {% endif %}
                         </td>
-                        <td class="text-nowrap">
-                            <a href="{{ url_for('seller.edit_listing', lid=listing['Listing_ID']) }}"
-                                class="btn btn-sm btn-outline-secondary">Edit</a>
-                        </td>
+                        <!-- if the listing has bids, editing should be grayed out / locked -->
+                        {% if listing['bid_count'] > 0 %}
+                            <td>
+                                <button class="btn btn-sm btn-outline-secondary disabled" title="Editing locked - bidding has started">Edit</button>
+                            </td>
+                        {% else %}
+                            <td>
+                                <a href="{{ url_for('seller.edit_listing', lid=listing['Listing_ID']) }}"
+                                    class="btn btn-sm btn-outline-primary">Edit</a>
+                            </td>
+                        {% endif %}
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-4">
+                        <td colspan="10" class="text-center text-muted py-4">
                             No active listings yet.
                             <a href="{{ url_for('seller.list_product') }}">List a product</a> to get started.
                         </td>
@@ -119,7 +126,7 @@
                     {% endfor %}
                     {% if active_listings %}
                     <tr>
-                        <td colspan="9" class="text-center text-muted p-3">
+                        <td colspan="10" class="text-center text-muted p-3">
                             <a href="{{ url_for('seller.list_product') }}">List another product</a>
                         </td>
                     </tr>
