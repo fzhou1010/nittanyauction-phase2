@@ -43,8 +43,10 @@ app.register_blueprint(notifications_bp, url_prefix='/notifications')  # shared 
 @app.route('/')
 def index():
     # If already logged in, go to listings; otherwise go to login page
-    
+
     if 'roles' not in session:
+        if 'email' in session and session.get('available_roles'):
+            return redirect(url_for('auth.choose_role'))
         return redirect(url_for('auth.login'))
     if 'helpdesk' in session['roles']:                                                                                                                       
         return redirect(url_for('helpdesk.welcome'))

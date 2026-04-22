@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS Sellers (
     email TEXT,
     bank_routing_number TEXT,
     bank_account_number TEXT,
-    balance REAL DEFAULT 0,
+    balance REAL DEFAULT 0 CHECK(balance >= 0),
     PRIMARY KEY (email),
     FOREIGN KEY (email) REFERENCES Users(email)
 );
@@ -98,14 +98,14 @@ CREATE TABLE IF NOT EXISTS Auction_Listings (
     Product_Description TEXT,
     Condition TEXT,
     Quantity INTEGER DEFAULT 1,
-    Reserve_Price REAL,
-    Max_bids INTEGER,
+    Reserve_Price REAL NOT NULL,
+    Max_bids INTEGER NOT NULL,
     remaining_bids INTEGER, --the number of bids on the product during the time of removal, if removed
     reason_of_removal TEXT, -- added a reason of removal from the auction listing
     is_promoted INTEGER DEFAULT 0, -- binary for whether the product is under promotion or not, default 0 for no
     promotion_fee REAL,
     promotion_time TIME,
-    Status INTEGER DEFAULT 1,
+    Status INTEGER DEFAULT 1 CHECK(Status IN (0,1,2)),
     PRIMARY KEY (Seller_Email, Listing_ID),
     FOREIGN KEY (Seller_Email) REFERENCES Sellers(email),
     -- ON UPDATE CASCADE keeps listings consistent with helpdesk-driven category renames.
@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS Bids (
     Seller_Email TEXT NOT NULL,
     Listing_ID INTEGER NOT NULL,
     Bidder_Email TEXT NOT NULL,
-    Bid_Price REAL NOT NULL,
+    Bid_Price REAL NOT NULL CHECK(Bid_Price > 0),
     FOREIGN KEY (Seller_Email, Listing_ID) REFERENCES Auction_Listings(Seller_Email, Listing_ID),
     FOREIGN KEY (Bidder_Email) REFERENCES Bidders(email)
 );
@@ -219,3 +219,13 @@ SELECT Seller_Email,
        MAX(Bid_Price) AS Current_Bid
 FROM Bids
 GROUP BY Seller_Email, Listing_ID;
+
+-- Indexes on hot query paths identified in audit:
+-- Notifications is queried by (recipient, is_read) on every page load via the
+-- app-level context processor; the other four back the frequent filter/join
+-- patterns in browse, seller dashboard, cart, and Seller_Avg_Rating.
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient_unread ON Notifications(recipient_email, is_read);
+CREATE INDEX IF NOT EXISTS idx_bids_listing ON Bids(Seller_Email, Listing_ID);
+CREATE INDEX IF NOT EXISTS idx_listings_status_category ON Auction_Listings(Status, Category);
+CREATE INDEX IF NOT EXISTS idx_rating_seller ON Rating(Seller_Email);
+CREATE INDEX IF NOT EXISTS idx_cart_bidder ON Shopping_Cart(Bidder_Email);
