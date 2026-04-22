@@ -32,7 +32,7 @@ LOAD_ORDER = [
     ('Categories.csv', 'Categories', ['parent_category', 'category_name']),
     ('Auction_Listings.csv', 'Auction_Listings', ['Seller_Email', 'Listing_ID', 'Category', 'Auction_Title', 'Product_Name', 'Product_Description', 'Quantity', 'Reserve_Price', 'Max_bids', 'Status']),
     ('Bids.csv', 'Bids', ['Bid_ID', 'Seller_Email', 'Listing_ID', 'Bidder_Email', 'Bid_Price']),
-    ('Transactions.csv', 'Transactions', ['Transaction_ID', 'Seller_Email', 'Listing_ID', 'Buyer_Email', 'Date', 'Payment']),
+    ('Transactions.csv', 'Transactions', ['Transaction_ID', 'Seller_Email', 'Listing_ID', 'Bidder_Email', 'Date', 'Payment']),
     ('Ratings.csv', 'Rating', ['Bidder_Email', 'Seller_Email', 'Date', 'Rating', 'Rating_Desc']),
     ('Requests.csv', 'Requests', ['request_id', 'sender_email', 'helpdesk_staff_email', 'request_type', 'request_desc', 'request_status']),
 ]

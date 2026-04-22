@@ -127,12 +127,12 @@ CREATE TABLE IF NOT EXISTS Transactions (
     Transaction_ID INTEGER,
     Seller_Email TEXT NOT NULL,
     Listing_ID INTEGER NOT NULL,
-    Buyer_Email TEXT NOT NULL,
+    Bidder_Email TEXT NOT NULL,
     Date TEXT,
     Payment REAL,
     PRIMARY KEY (Transaction_ID),
     FOREIGN KEY (Seller_Email, Listing_ID) REFERENCES Auction_Listings(Seller_Email, Listing_ID),
-    FOREIGN KEY (Buyer_Email) REFERENCES Bidders(email)
+    FOREIGN KEY (Bidder_Email) REFERENCES Bidders(email)
 );
 
 CREATE TABLE IF NOT EXISTS Rating (

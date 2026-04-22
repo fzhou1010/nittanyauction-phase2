@@ -491,7 +491,7 @@ def pay(seller_email, listing_id):
     db = get_db()
     from datetime import date
     db.execute(
-        'INSERT INTO Transactions (Seller_Email, Listing_ID, Buyer_Email, Date, Payment) '
+        'INSERT INTO Transactions (Seller_Email, Listing_ID, Bidder_Email, Date, Payment) '
         'VALUES (?, ?, ?, ?, ?)',
         [seller_email, listing_id, email, date.today().isoformat(), amount],
     )

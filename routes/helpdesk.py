@@ -224,7 +224,7 @@ def _handle_change_id(db, req):
         ('Bids', 'Seller_Email'),
         ('Auction_Listings', 'Seller_Email'),
         ('Transactions', 'Seller_Email'),
-        ('Transactions', 'Buyer_Email'),
+        ('Transactions', 'Bidder_Email'),
         ('Rating', 'Bidder_Email'),
         ('Rating', 'Seller_Email'),
         ('Questions', 'Bidder_Email'),
@@ -415,7 +415,7 @@ def analytics():
     sales_under_30 = query_db(
         'SELECT COALESCE(SUM(t.Payment), 0) AS total '
         'FROM Transactions t '
-        'JOIN Bidders b ON b.email = t.Buyer_Email '
+        'JOIN Bidders b ON b.email = t.Bidder_Email '
         'WHERE b.age < 30',
         one=True,
     )

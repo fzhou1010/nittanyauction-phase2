@@ -123,7 +123,7 @@ def auction_history():
         LEFT JOIN Transactions t
             ON t.Seller_Email = al.Seller_Email
            AND t.Listing_ID  = al.Listing_ID
-           AND t.Buyer_Email = ?
+           AND t.Bidder_Email = ?
         WHERE al.Status != 1
           AND ? = (
               SELECT Bidder_Email FROM Bids b

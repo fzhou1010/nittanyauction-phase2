@@ -55,7 +55,7 @@ def dashboard():
     #try and query for the transaction data per sold listing
     sold_listings_details = []
     for listing in sold_listings:
-        transaction_detail = query_db("""SELECT Buyer_Email, Payment, Date
+        transaction_detail = query_db("""SELECT Bidder_Email, Payment, Date
                                         FROM Transactions
                                       WHERE Seller_Email = ? AND Listing_ID = ?""", [email, listing['Listing_ID']], one=True) # we return this as one row
         #append the objects to sold listing details if they exist for the listing
@@ -65,7 +65,7 @@ def dashboard():
             'Product_Name': listing['Product_Name'],
             'Category': listing['Category'],
             # add the transaction details if found, otherwise return None for Jinja
-            'Buyer_Email': transaction_detail['Buyer_Email'] if transaction_detail else None, 
+            'Bidder_Email': transaction_detail['Bidder_Email'] if transaction_detail else None, 
             'Payment': transaction_detail['Payment'] if transaction_detail else None,
             'Date': transaction_detail['Date'] if transaction_detail else None
         })
