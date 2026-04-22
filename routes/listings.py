@@ -317,9 +317,12 @@ def detail(seller_email, listing_id):
     )
 
     avg_rating = query_db(
-        "SELECT AVG(Rating) as Avg_Rating From Rating WHERE Seller_Email = ?",
+        "SELECT Avg_Rating FROM Seller_Avg_Rating WHERE Seller_Email = ?",
         [seller_email], one=True
     )
+    # view returns no row for unrated sellers; template checks avg_rating.Avg_Rating truthiness
+    if not avg_rating:
+        avg_rating = {'Avg_Rating': None}
 
     return render_template(
         'listings/detail.html',

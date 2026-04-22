@@ -27,13 +27,13 @@ def shopping_cart():
             c.Seller_Email, c.Listing_ID, c.added_at,
             al.Auction_Title, al.Product_Name, al.Category,
             al.Max_bids, al.Status,
-            (SELECT MAX(Bid_Price) FROM Bids b
-                WHERE b.Seller_Email = c.Seller_Email AND b.Listing_ID = c.Listing_ID) AS current_bid,
-            (SELECT COUNT(*) FROM Bids b
-                WHERE b.Seller_Email = c.Seller_Email AND b.Listing_ID = c.Listing_ID) AS bid_count
+            s.Current_Bid AS current_bid,
+            COALESCE(s.Bid_Count, 0) AS bid_count
         FROM Shopping_Cart c
         JOIN Auction_Listings al
           ON al.Seller_Email = c.Seller_Email AND al.Listing_ID = c.Listing_ID
+        LEFT JOIN Listing_Bid_Stats s
+          ON s.Seller_Email = c.Seller_Email AND s.Listing_ID = c.Listing_ID
         WHERE c.Bidder_Email = ?
         ORDER BY c.added_at DESC
         ''',

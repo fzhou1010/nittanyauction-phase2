@@ -24,30 +24,28 @@ def dashboard():
 
     has_card = query_db('SELECT 1 FROM Credit_Cards WHERE Owner_email = ?', [email], one=True) is not None
     
-    #we also want to show the active current active listings of the seller along with some details
-    active_listings = query_db('''SELECT l.Listing_ID, l.Auction_Title, l.Product_Name, l.Category, l.Reserve_Price, l.Max_bids, l.is_promoted
-        FROM Auction_Listings l 
-        WHERE l.Seller_Email = ? AND Status = 1''', [email]) # use triple quotes instead to fix bug of wrapping
-        
-    
+    # Active listings + per-listing bid stats in a single query via the Listing_Bid_Stats view.
+    # LEFT JOIN so listings with zero bids still appear.
+    active_listings = query_db('''SELECT l.Listing_ID, l.Auction_Title, l.Product_Name, l.Category, l.Reserve_Price, l.Max_bids, l.is_promoted,
+               COALESCE(s.Bid_Count, 0) AS bid_count,
+               s.Current_Bid AS highest_bid
+        FROM Auction_Listings l
+        LEFT JOIN Listing_Bid_Stats s
+          ON s.Seller_Email = l.Seller_Email AND s.Listing_ID = l.Listing_ID
+        WHERE l.Seller_Email = ? AND l.Status = 1''', [email])
 
-    #query the specific detail of each active listing
     active_listing_details = []
-    for listing in active_listings: #for each listing in the active listings, we also want to get the current bidding history
-        bidding_information = query_db("""SELECT COUNT (*) AS bid_count, MAX(b.Bid_Price) as highest_bid
-                                         FROM bids b
-                                         WHERE b.Seller_Email = ? AND Listing_ID = ?""", [email, listing['Listing_ID']], one=True) #we nned this to be true as this returns a single row
-        # append an object with key-value pairs with the details to the list 
+    for listing in active_listings:
         active_listing_details.append({
             'Listing_ID': listing["Listing_ID"],
-            'Auction_Title': listing['Auction_Title'],     
-            'Product_Name': listing['Product_Name'],       
-            'Category': listing['Category'],               
-            'Reserve_Price': listing['Reserve_Price'],     
-            'Max_bids': listing['Max_bids'],               
-            'bid_count': bidding_information['bid_count'],            
-            'highest_bid': bidding_information['highest_bid'],
-            'is_promoted': listing['is_promoted'] or 0 # default to 0 if is_promoted is None
+            'Auction_Title': listing['Auction_Title'],
+            'Product_Name': listing['Product_Name'],
+            'Category': listing['Category'],
+            'Reserve_Price': listing['Reserve_Price'],
+            'Max_bids': listing['Max_bids'],
+            'bid_count': listing['bid_count'],
+            'highest_bid': listing['highest_bid'],
+            'is_promoted': listing['is_promoted'] or 0
         })
 
     #also want to retrieve sold listings for the specific seller, along with transaction status
@@ -80,10 +78,13 @@ def dashboard():
     q_count = query_db('''SELECT COUNT (*) as q_count
                        FROM Questions
                        WHERE Seller_Email = ? AND answered = 0''', [email], one=True)
-    # get the average rating of the seller from the rating table
-    seller_rating = query_db('''SELECT AVG(Rating) AS avg_rating, COUNT(*) AS count
-                             FROM Rating
+    # get the average rating of the seller via the Seller_Avg_Rating view
+    seller_rating = query_db('''SELECT Avg_Rating AS avg_rating, Rating_Count AS count
+                             FROM Seller_Avg_Rating
                              WHERE Seller_Email = ?''', [email], one=True)
+    # view returns no row when the seller has zero ratings; preserve the {avg_rating, count} shape
+    if not seller_rating:
+        seller_rating = {'avg_rating': None, 'count': 0}
     
     return render_template('seller/dashboard.html', bal=bal, active_listings=active_listing_details, sold_listings=sold_listings_details,
                            q_count=q_count, seller_rating=seller_rating, inactive_listings=inactive_listings, has_card=has_card)

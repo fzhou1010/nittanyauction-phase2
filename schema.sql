@@ -198,3 +198,24 @@ CREATE TABLE IF NOT EXISTS Shopping_Cart (
     FOREIGN KEY (Bidder_Email) REFERENCES Bidders(email) ON DELETE CASCADE,
     FOREIGN KEY (Seller_Email, Listing_ID) REFERENCES Auction_Listings(Seller_Email, Listing_ID) ON DELETE CASCADE
 );
+
+-- Per-seller rating aggregate. Used anywhere avg rating / rating count is displayed
+-- (seller dashboard, listing detail, future browse cards) so the aggregate lives in
+-- one place and all callers stay consistent.
+CREATE VIEW IF NOT EXISTS Seller_Avg_Rating AS
+SELECT Seller_Email,
+       AVG(Rating) AS Avg_Rating,
+       COUNT(*) AS Rating_Count
+FROM Rating
+GROUP BY Seller_Email;
+
+-- Per-listing bid aggregate (current highest bid + total bid count).
+-- Replaces the correlated MAX/COUNT subqueries that recurred across the dashboard,
+-- cart, and browse paths, and collapses the seller-dashboard N+1 into a LEFT JOIN.
+CREATE VIEW IF NOT EXISTS Listing_Bid_Stats AS
+SELECT Seller_Email,
+       Listing_ID,
+       COUNT(*) AS Bid_Count,
+       MAX(Bid_Price) AS Current_Bid
+FROM Bids
+GROUP BY Seller_Email, Listing_ID;
