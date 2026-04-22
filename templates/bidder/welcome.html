@@ -11,7 +11,9 @@
             <a href="{{ url_for('bidder.watchlist') }}" class="btn btn-outline-secondary">Watchlist</a>
         </div>
         <div class="mt-3">
-            <a href="{{ url_for('bidder.apply_seller') }}" class="btn btn-sm btn-link">Want to sell items? Apply to become a seller</a>
+            <a href="{{ url_for('auth.profile') }}?tab=support" class="btn btn-sm btn-link">
+                Want to sell items? Apply to become a seller
+            </a>
         </div>
     </div>
 </div>
