@@ -4,6 +4,14 @@ from notifications import notify
 
 listings_bp = Blueprint('listings', __name__)
 
+def get_all_subcategories(category):
+    #Recursively get all subcategories of a given category
+    subcats = [category]
+    children = query_db('SELECT category_name FROM Categories WHERE parent_category = ?', [category])
+    for child in children:
+        subcats.extend(get_all_subcategories(child['category_name']))
+    return subcats
+
 
 def _notify_auction_close(seller_email, listing_id, title, outcome, winner=None, amount=None):
     """Notify every bidder and cart-holder of the auction outcome."""
@@ -160,6 +168,30 @@ def browse():
         )
         cur = parent['parent_category'] if parent and parent['parent_category'] != ROOT_PARENT else None
 
+    if not category:
+        promoted_listings = query_db('''
+            SELECT *,
+                (SELECT MAX(Bid_Price) FROM Bids b
+                WHERE b.Seller_Email = Auction_Listings.Seller_Email
+                AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
+            FROM Auction_Listings 
+            WHERE is_promoted = 1 AND Status = 1
+            ORDER BY promotion_time DESC
+        ''')
+    else:
+        all_cats = get_all_subcategories(category)
+        placeholders = ','.join('?' * len(all_cats))
+        promoted_listings = query_db(f'''
+            SELECT *,
+                (SELECT MAX(Bid_Price) FROM Bids b
+                WHERE b.Seller_Email = Auction_Listings.Seller_Email
+                AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
+            FROM Auction_Listings 
+            WHERE is_promoted = 1 AND Status = 1 
+            AND Category IN ({placeholders})
+            ORDER BY promotion_time DESC
+        ''', all_cats)
+
     return render_template(
         'listings/browse.html',
         mode='hierarchy',
@@ -167,6 +199,7 @@ def browse():
         listings=listings,
         category_path=path,
         current_category=category,
+        promoted_listings=promoted_listings
     )
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>')
