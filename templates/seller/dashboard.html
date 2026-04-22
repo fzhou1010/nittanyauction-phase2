@@ -102,7 +102,7 @@
                                     <i></i>Featured
                                 </span>
                             {% elif not has_card %}
-                                <a href="{{ url_for('auth.profile') }}" class="btn btn-sm btn-outline-secondary text-nowrap"
+                                <a href="{{ url_for('auth.profile') }}?tab=payment" class="btn btn-sm btn-outline-secondary text-nowrap"
                                     onclick="return confirm('You need a credit card on file to promote a listing. Go to your profile to add one.')">
                                     <i class="bi bi-megaphone me-1"></i>Promote
                                 </a>
@@ -198,7 +198,7 @@
                 <tbody>
                     {% for listing in sold_listings %}
                     <tr>
-                        <td><span class="badge text-danger">Sold</span></td>
+                        <td><span class="badge bg-danger text-white">Sold</span></td>
                         <td>
                             <a href="{{ url_for('listings.detail', seller_email=session['email'], listing_id=listing['Listing_ID']) }}" class="text-decoration-none hover-underline text-body">
                                 {{ listing['Auction_Title'] }}

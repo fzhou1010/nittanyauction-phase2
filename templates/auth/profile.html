@@ -172,7 +172,11 @@
                         {% if 'seller' not in session.get('available_roles', []) %}
                         <hr>
                         <h3 class="mb-4">Apply To Become A Seller</h3>
-                            <p class="text-muted small">Submit a request to become a seller on NittanyAuction.</p>
+                            <p class="text-muted small">
+                                NittanyAuction lets you list your own items for auction once a HelpDesk
+                                staff member approves your application. Submit your banking details below
+                                so sale proceeds can be deposited into your account.
+                            </p>
                             <form action="{{ url_for('auth.promote') }}" method="POST">
                                 <div class="mb-3">
                                         <label class="form-label">Add Bank Routing Number</label>
@@ -222,4 +226,19 @@
     </div>
 </div>
 
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    if (tab === 'support') {
+        const tabEl = document.querySelector('#support-list');
+        if (tabEl) bootstrap.Tab.getOrCreateInstance(tabEl).show();
+    } else if (tab === 'payment') {
+        const tabEl = document.querySelector('#pay-list');
+        if (tabEl) bootstrap.Tab.getOrCreateInstance(tabEl).show();
+    }
+});
+</script>
 {% endblock %}
