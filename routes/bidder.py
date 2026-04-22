@@ -16,11 +16,6 @@ def require_login():
 def welcome():
     return render_template('bidder/welcome.html')
 
-@bidder_bp.route('/watchlist')
-def watchlist():
-    # TODO: list/add/remove watchlist entries
-    return render_template('bidder/watchlist.html')
-
 @bidder_bp.route('/cart')
 def shopping_cart():
     rows = query_db(

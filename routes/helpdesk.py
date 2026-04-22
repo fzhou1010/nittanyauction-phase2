@@ -243,7 +243,6 @@ def _handle_change_id(db, req):
         ('Rating', 'Seller_Email'),
         ('Questions', 'Bidder_Email'),
         ('Questions', 'Seller_Email'),
-        ('Watchlist', 'Bidder_Email'),
         ('Shopping_Cart', 'Bidder_Email'),
         ('Shopping_Cart', 'Seller_Email'),
         ('Local_Vendors', 'email'),
