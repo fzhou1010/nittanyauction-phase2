@@ -281,6 +281,24 @@ def pending_user():
 def register():
     return render_template('auth/register.html')
 
+def _card_expired(expire_month, expire_year):
+    # true if the month/year combo is before today's month
+    try:
+        em, ey = int(expire_month), int(expire_year)
+    except (TypeError, ValueError):
+        return True
+    if em < 1 or em > 12:
+        return True
+    from datetime import date
+    today = date.today()
+    return (ey, em) < (today.year, today.month)
+
+
+def _reject(role, errors):
+    # re-render the form with the user's entries preserved and the bad fields flagged
+    return render_template('auth/register_form.html', role=role, form=request.form, errors=errors)
+
+
 @auth_bp.route('/register/<role>', methods=['GET', 'POST'])
 def register_form(role):
     # we can persist the role the user chose by including it in the URL of the browser
@@ -297,20 +315,21 @@ def register_form(role):
             #ensure that the email ends in LSU even though it should be enforced client side
             if not email.endswith('@lsu.edu'):
                 flash('Bidders/Student sellers must use an @lsu.edu email address')
-                return render_template('auth/register_form.html', role=role)
+                return _reject(role, {'email': 'Must be an @lsu.edu address.'})
         if pswd != confirm_pswd:
             flash("Passwords don't Match")
-            return render_template('auth/register_form.html', role=role)
-        
+            return _reject(role, {'password': "Passwords don't match.",
+                                  'confirm_password': "Passwords don't match."})
+
         #hash the passwords based on the requirement by the SHA256 encoding
         hashed_pswd = hashlib.sha256(pswd.encode('utf-8')).hexdigest()
         #check if the email already exists in the database
         user = query_db('SELECT * FROM Users WHERE email = ?',
                         [email], one=True)
-        
+
         if user: # means that this user has already been registered to the database
             flash('Email already registered to an account, please login with correct credentials')
-            return render_template('auth/register_form.html', role=role)
+            return _reject(role, {'email': 'This email is already registered.'})
         
         #everything passed, meaning ready to send to database
         # we want to get the corresponding data for the specific roles
@@ -321,7 +340,7 @@ def register_form(role):
             missing = [f for f in required if not request.form.get(f, '').strip()]
             if missing:
                 flash('Please fill in all required fields: ' + ', '.join(missing))
-                return render_template('auth/register_form.html', role=role)
+                return _reject(role, {f: 'Required.' for f in missing})
             first_name = request.form['first_name']
             last_name = request.form['last_name']
             age = request.form.get('age') # we can use .get from the forms as these fields are not mandatory to the user signing up to use the page
@@ -338,9 +357,13 @@ def register_form(role):
             expire_month = request.form['expire_month']
             expire_year = request.form['expire_year']
             security_code = request.form['security_code']
+            if _card_expired(expire_month, expire_year):
+                flash('That credit card is expired.')
+                return _reject(role, {'expire_month': 'Card is expired.',
+                                      'expire_year': 'Card is expired.'})
             if query_db('SELECT 1 FROM Credit_Cards WHERE credit_card_num = ?', [credit_card_num], one=True):
                 flash('Cards cannot be shared across accounts — this card is already registered to another user.')
-                return render_template('auth/register_form.html', role=role)
+                return _reject(role, {'credit_card_num': 'Card already registered to another account.'})
             try:
                 # the order of insert into matters, as we want don;t want an integrity error
                 db.execute('INSERT INTO Users (email, password) VALUES (?, ?)', [email, hashed_pswd])
@@ -365,8 +388,8 @@ def register_form(role):
                 #flash(f'Error saving information into the database: {e}')
             except sql.IntegrityError:
                 flash('Error saving information into the database.')
-                return render_template('auth/register_form.html', role=role)
-            
+                return _reject(role, {})
+
         elif role == 'student_seller':
             required = ['first_name', 'last_name', 'phone', 'street_num', 'street_name', 'zipcode', 'city', 'state',
                         'credit_card_num', 'card_type', 'expire_month', 'expire_year', 'security_code',
@@ -374,7 +397,7 @@ def register_form(role):
             missing = [f for f in required if not request.form.get(f, '').strip()]
             if missing:
                 flash('Please fill in all required fields: ' + ', '.join(missing))
-                return render_template('auth/register_form.html', role=role)
+                return _reject(role, {f: 'Required.' for f in missing})
             first_name = request.form['first_name']
             last_name = request.form['last_name']
             age = request.form.get('age') # we can use .get from the forms as these fields are not mandatory to the user signing up to use the page
@@ -393,9 +416,13 @@ def register_form(role):
             expire_month = request.form['expire_month']
             expire_year = request.form['expire_year']
             security_code = request.form['security_code']
+            if _card_expired(expire_month, expire_year):
+                flash('That credit card is expired.')
+                return _reject(role, {'expire_month': 'Card is expired.',
+                                      'expire_year': 'Card is expired.'})
             if query_db('SELECT 1 FROM Credit_Cards WHERE credit_card_num = ?', [credit_card_num], one=True):
                 flash('Cards cannot be shared across accounts — this card is already registered to another user.')
-                return render_template('auth/register_form.html', role=role)
+                return _reject(role, {'credit_card_num': 'Card already registered to another account.'})
             try:
                 # the order of insert into matters, as we want don;t want an integrity error
                 db.execute('INSERT INTO Users (email, password) VALUES (?, ?)', [email, hashed_pswd])
@@ -417,14 +444,14 @@ def register_form(role):
                 return redirect(url_for('seller.dashboard'))
             except sql.IntegrityError:
                 flash('Error saving information into the database.')
-                return render_template('auth/register_form.html', role=role)
+                return _reject(role, {})
         else: #means that the role is local_vendor
             required = ['business_name', 'cs_phone_num', 'street_num', 'street_name', 'zipcode', 'city', 'state',
                         'bank_account_num', 'bank_routing_num']
             missing = [f for f in required if not request.form.get(f, '').strip()]
             if missing:
                 flash('Please fill in all required fields: ' + ', '.join(missing))
-                return render_template('auth/register_form.html', role=role)
+                return _reject(role, {f: 'Required.' for f in missing})
             business_name = request.form['business_name']
             cs_phone_num = request.form['cs_phone_num']
             #business address information, saved to the address table
@@ -456,15 +483,12 @@ def register_form(role):
                 return redirect(url_for('seller.dashboard'))
             except sql.IntegrityError:
                 flash('Error saving information into the database.')
-                return render_template('auth/register_form.html', role=role)
+                return _reject(role, {})
             except Exception as e:
                 flash(f'Error saving information: {e}')
-                return render_template('auth/register_form.html', role=role)
-            
+                return _reject(role, {})
 
-
-        
-    return render_template('auth/register_form.html', role=role)
+    return render_template('auth/register_form.html', role=role, form={}, errors={})
     
 
 @auth_bp.route('/logout')

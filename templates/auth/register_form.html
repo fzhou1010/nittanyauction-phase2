@@ -1,238 +1,268 @@
 {% extends "base.html" %}
 {% block title %}Nittany Auction - Register{% endblock %}
 {% block content %}
-<!-- split the registration form and the registration choices on different pages: -->
-<!-- we can use jinja to set up if blocks to show/hide sections from class passed in from Flask-->
+{% set form = form or {} %}
+{% set errors = errors or {} %}
+
+{%- macro flabel(name, text, extra='') -%}
+<label class="form-label {{ extra }}{% if errors.get(name) %} text-danger fw-bold{% endif %}">{{ text }}{% if errors.get(name) %} <span class="text-danger">*</span>{% endif %}</label>
+{%- endmacro -%}
+
+{%- macro fcls(name) -%}
+form-control{% if errors.get(name) %} is-invalid{% endif %}
+{%- endmacro -%}
+
+{%- macro selcls(name) -%}
+form-select{% if errors.get(name) %} is-invalid{% endif %}
+{%- endmacro -%}
+
+{%- macro ffeedback(name) -%}
+{% if errors.get(name) %}<div class="invalid-feedback">{{ errors[name] }}</div>{% endif %}
+{%- endmacro -%}
+
     <div class="row justify-content-center ">
     <div class="col-md-6 mb-3">
         <a class="" href="{{url_for('auth.register')}}"><i class="bi bi-arrow-left mr-1"></i>Back</a>
-        <form method="POST">
+        <form method="POST" novalidate>
         {% if role == 'bidder' or role == 'student_seller' %}
-            <!-- Personal Information Section-->
             <div class="row">
                 <h5 class="mt-4">Login Credentials</h5>
-                <div className="email-field" class="mt-4 mb-3">
-                    <label class="form-label">Email</label>
-                    <input type="email" id="student_email_field" name="email" class="form-control" required>
+                <div class="mt-4 mb-3">
+                    {{ flabel('email', 'Email') }}
+                    <input type="email" id="student_email_field" name="email"
+                           value="{{ form.get('email', '') }}" class="{{ fcls('email') }}" required>
+                    {{ ffeedback('email') }}
                 </div>
                 <small id="email-error" class="text-danger"></small>
-                <div className="password-field" class="mb-3">
-                    <label class="form-label">Password</label>
-                    <input type="password" id="password" name="password" class="form-control" required>
+                <div class="mb-3">
+                    {{ flabel('password', 'Password') }}
+                    <input type="password" id="password" name="password" class="{{ fcls('password') }}" required>
+                    {{ ffeedback('password') }}
                 </div>
-                <div  className="cpassword-field" class="mb-3">
-                    <label class="form-label">Confirm Password</label>
-                    <input type="password" id="confirm_password" name="confirm_password" class="form-control" required>
+                <div class="mb-3">
+                    {{ flabel('confirm_password', 'Confirm Password') }}
+                    <input type="password" id="confirm_password" name="confirm_password" class="{{ fcls('confirm_password') }}" required>
+                    {{ ffeedback('confirm_password') }}
                 </div>
                 <small id="password-mismatch" class="text-danger"></small>
             </div>
             <h5 class="mt-4 mb-3">Personal Information</h5>
             <div class="row">
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">First Name</label>
-                    <input type="text" name="first_name" class="form-control" required>
+                    {{ flabel('first_name', 'First Name') }}
+                    <input type="text" name="first_name" value="{{ form.get('first_name', '') }}" class="{{ fcls('first_name') }}" required>
+                    {{ ffeedback('first_name') }}
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">Last Name</label>
-                    <input type="text" name="last_name" class="form-control" required>
+                    {{ flabel('last_name', 'Last Name') }}
+                    <input type="text" name="last_name" value="{{ form.get('last_name', '') }}" class="{{ fcls('last_name') }}" required>
+                    {{ ffeedback('last_name') }}
                 </div>
             </div>
             <div class="row">
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">Age</label>
-                    <input type="number" name="age" class="form-control" min="1" max="120">
+                    {{ flabel('age', 'Age') }}
+                    <input type="number" name="age" min="1" max="120" value="{{ form.get('age', '') }}" class="{{ fcls('age') }}">
+                    {{ ffeedback('age') }}
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">Major</label>
-                    <input type="text" name="major" class="form-control">
+                    {{ flabel('major', 'Major') }}
+                    <input type="text" name="major" value="{{ form.get('major', '') }}" class="{{ fcls('major') }}">
+                    {{ ffeedback('major') }}
                 </div>
             </div>
             <div class="row">
                 <div class="col-md-6 mb-3">
-                    <label class="form-label">Phone</label>
-                    <input type="tel" name="phone" class="form-control" required>
+                    {{ flabel('phone', 'Phone') }}
+                    <input type="tel" name="phone" value="{{ form.get('phone', '') }}" class="{{ fcls('phone') }}" required>
+                    {{ ffeedback('phone') }}
                 </div>
             </div>
-            <!-- Home Address Section -->
             <h5 class="mt-4">Home Address</h5>
             <div class="row">
                 <div class="col-md-4 mb-3">
-                    <label class="form-label">Street Number</label>
-                    <input type="text" name="street_num" class="form-control" required>
+                    {{ flabel('street_num', 'Street Number') }}
+                    <input type="text" name="street_num" value="{{ form.get('street_num', '') }}" class="{{ fcls('street_num') }}" required>
+                    {{ ffeedback('street_num') }}
                 </div>
                 <div class="col-md-8 mb-3">
-                    <label class="form-label">Street Name</label>
-                    <input type="text" name="street_name" class="form-control" required>
+                    {{ flabel('street_name', 'Street Name') }}
+                    <input type="text" name="street_name" value="{{ form.get('street_name', '') }}" class="{{ fcls('street_name') }}" required>
+                    {{ ffeedback('street_name') }}
                 </div>
             </div>
             <div class="row">
                 <div class="col-md-4 mb-3">
-                    <label class="form-label">Zipcode</label>
-                    <input type="text" name="zipcode" class="form-control" required>
+                    {{ flabel('zipcode', 'Zipcode') }}
+                    <input type="text" name="zipcode" value="{{ form.get('zipcode', '') }}" class="{{ fcls('zipcode') }}" required>
+                    {{ ffeedback('zipcode') }}
                 </div>
                 <div class="col-md-4 mb-3">
-                    <label class="form-label">City</label>
-                    <input type="text" name="city" class="form-control" required>
+                    {{ flabel('city', 'City') }}
+                    <input type="text" name="city" value="{{ form.get('city', '') }}" class="{{ fcls('city') }}" required>
+                    {{ ffeedback('city') }}
                 </div>
                 <div class="col-md-4 mb-3">
-                    <label class="form-label">State</label>
-                    <input type="text" name="state" class="form-control" required>
+                    {{ flabel('state', 'State') }}
+                    <input type="text" name="state" value="{{ form.get('state', '') }}" class="{{ fcls('state') }}" required>
+                    {{ ffeedback('state') }}
                 </div>
             </div>
             <h5 class="mt-4 mb-3">Credit Card</h5>
             <div class="row">
                 <div class="col-md-8 mb-3">
-                    <label class="form-label">Card Number</label>
-                    <input type="text" name="credit_card_num" class="form-control" required>
+                    {{ flabel('credit_card_num', 'Card Number') }}
+                    <input type="text" name="credit_card_num" value="{{ form.get('credit_card_num', '') }}" class="{{ fcls('credit_card_num') }}" required>
+                    {{ ffeedback('credit_card_num') }}
                 </div>
                 <div class="col-md-4 mb-3">
-                    <label class="form-label">Card Type</label>
-                    <select name="card_type" class="form-select" required>
-                        <option value="Visa">Visa</option>
-                        <option value="MasterCard">MasterCard</option>
-                        <option value="American Express">American Express</option>
-                        <option value="Discover">Discover</option>
+                    {{ flabel('card_type', 'Card Type') }}
+                    {% set ct = form.get('card_type', '') %}
+                    <select name="card_type" class="{{ selcls('card_type') }}" required>
+                        <option value="Visa" {% if ct == 'Visa' %}selected{% endif %}>Visa</option>
+                        <option value="MasterCard" {% if ct == 'MasterCard' %}selected{% endif %}>MasterCard</option>
+                        <option value="American Express" {% if ct == 'American Express' %}selected{% endif %}>American Express</option>
+                        <option value="Discover" {% if ct == 'Discover' %}selected{% endif %}>Discover</option>
                     </select>
+                    {{ ffeedback('card_type') }}
                 </div>
             </div>
             <div class="row">
                 <div class="col-md-4 mb-3">
-                    <label class="form-label">Expire Month</label>
-                    <input type="number" name="expire_month" class="form-control" min="1" max="12" required>
+                    {{ flabel('expire_month', 'Expire Month') }}
+                    <input type="number" name="expire_month" min="1" max="12" value="{{ form.get('expire_month', '') }}" class="{{ fcls('expire_month') }}" required>
+                    {{ ffeedback('expire_month') }}
                 </div>
                 <div class="col-md-4 mb-3">
-                    <label class="form-label">Expire Year</label>
-                    <input type="number" name="expire_year" class="form-control" min="2026" max="2050" required>
+                    {{ flabel('expire_year', 'Expire Year') }}
+                    <input type="number" name="expire_year" min="2026" max="2050" value="{{ form.get('expire_year', '') }}" class="{{ fcls('expire_year') }}" required>
+                    {{ ffeedback('expire_year') }}
                 </div>
                 <div class="col-md-4 mb-3">
-                    <label class="form-label">Security Code</label>
-                    <input type="text" name="security_code" class="form-control" required>
+                    {{ flabel('security_code', 'Security Code') }}
+                    <input type="text" name="security_code" value="{{ form.get('security_code', '') }}" class="{{ fcls('security_code') }}" required>
+                    {{ ffeedback('security_code') }}
                 </div>
             </div>
             <script>
-                //we need to make sure that bidders and student sellers are using an LSU email and not an outside email address
                 const input_email = document.getElementById('student_email_field');
                 const errEmail = document.getElementById('email-error');
                 const email_check = () =>{
                     const email = input_email.value;
                     if (email && !email.endsWith('@lsu.edu')) {
                         errEmail.textContent = 'You must use an @lsu.edu email address';
-                    } 
+                    }
                     else {
                         errEmail.textContent = '';
                     }
                 };
-
                 input_email.addEventListener('input', email_check);
-
             </script>
         {% endif %}
 
         {% if role == 'local_vendor' %}
-        <!-- We want this block to be before banking details so that the business details can be entered first -->
-        
-        <!-- Business Information Section -->
         <div class="row">
             <h5 class="mt-4">Login Credentials</h5>
-            <div className="email-field" class="mt-4 mb-3">
-                <label class="form-label">Email</label>
-                <input type="email" name="email" class="form-control" required>
+            <div class="mt-4 mb-3">
+                {{ flabel('email', 'Email') }}
+                <input type="email" name="email" value="{{ form.get('email', '') }}" class="{{ fcls('email') }}" required>
+                {{ ffeedback('email') }}
             </div>
-            <div className="password-field" class="mb-3">
-                <label class="form-label">Password</label>
-                <input type="password" id="password" name="password" class="form-control" required>
+            <div class="mb-3">
+                {{ flabel('password', 'Password') }}
+                <input type="password" id="password" name="password" class="{{ fcls('password') }}" required>
+                {{ ffeedback('password') }}
             </div>
-            <div  className="cpassword-field" class="mb-3">
-                <label class="form-label">Confirm Password</label>
-                <input type="password" id="confirm_password" name="confirm_password" class="form-control" required>
+            <div class="mb-3">
+                {{ flabel('confirm_password', 'Confirm Password') }}
+                <input type="password" id="confirm_password" name="confirm_password" class="{{ fcls('confirm_password') }}" required>
+                {{ ffeedback('confirm_password') }}
             </div>
             <small id="password-mismatch" class="text-danger"></small>
         </div>
         <h5 class="mt-4 mb-3">Business Information</h5>
         <div class="row align-items-end">
             <div class="col-md-6 mb-3">
-                <label class="form-label mb-3">Business Name</label>
-                <input type="text" name="business_name" class="form-control" required>
+                {{ flabel('business_name', 'Business Name', 'mb-3') }}
+                <input type="text" name="business_name" value="{{ form.get('business_name', '') }}" class="{{ fcls('business_name') }}" required>
+                {{ ffeedback('business_name') }}
             </div>
             <div class="col-md-6 mb-3">
-                <label class="form-label mb-3">Customer Service Phone Number</label>
-                <input type="text" name="cs_phone_num" class="form-control" required>
+                {{ flabel('cs_phone_num', 'Customer Service Phone Number', 'mb-3') }}
+                <input type="text" name="cs_phone_num" value="{{ form.get('cs_phone_num', '') }}" class="{{ fcls('cs_phone_num') }}" required>
+                {{ ffeedback('cs_phone_num') }}
             </div>
         </div>
 
-        <!-- Business Address Section -->
         <h5 class="mt-4 mb-3">Business Address</h5>
         <div class="row">
             <div class="col-md-4 mb-3">
-                <label class="form-label">Street Number</label>
-                <input type="text" name="street_num" class="form-control" required>
+                {{ flabel('street_num', 'Street Number') }}
+                <input type="text" name="street_num" value="{{ form.get('street_num', '') }}" class="{{ fcls('street_num') }}" required>
+                {{ ffeedback('street_num') }}
             </div>
             <div class="col-md-8 mb-3">
-                <label class="form-label">Street Name</label>
-                <input type="text" name="street_name" class="form-control" required>
+                {{ flabel('street_name', 'Street Name') }}
+                <input type="text" name="street_name" value="{{ form.get('street_name', '') }}" class="{{ fcls('street_name') }}" required>
+                {{ ffeedback('street_name') }}
             </div>
         </div>
         <div class="row">
             <div class="col-md-4 mb-3">
-                <label class="form-label">Zipcode</label>
-                <input type="text" name="zipcode" class="form-control" required>
+                {{ flabel('zipcode', 'Zipcode') }}
+                <input type="text" name="zipcode" value="{{ form.get('zipcode', '') }}" class="{{ fcls('zipcode') }}" required>
+                {{ ffeedback('zipcode') }}
             </div>
             <div class="col-md-4 mb-3">
-                <label class="form-label">City</label>
-                <input type="text" name="city" class="form-control" required>
+                {{ flabel('city', 'City') }}
+                <input type="text" name="city" value="{{ form.get('city', '') }}" class="{{ fcls('city') }}" required>
+                {{ ffeedback('city') }}
             </div>
             <div class="col-md-4 mb-3">
-                <label class="form-label">State</label>
-                <input type="text" name="state" class="form-control" required>
+                {{ flabel('state', 'State') }}
+                <input type="text" name="state" value="{{ form.get('state', '') }}" class="{{ fcls('state') }}" required>
+                {{ ffeedback('state') }}
             </div>
         </div>
-
-
-
         {% endif %}
 
         {% if role == 'student_seller' or role == 'local_vendor' %}
-
-        <!-- Banking Information-->
-
         <h5 class="mt-4 mb-3">Banking Information</h5>
         <div class="row">
             <div class="col-md-6 mb-3">
-                <label class="form-label">Bank Account Number</label>
-                <input type="text" name="bank_account_num" class="form-control" required>
+                {{ flabel('bank_account_num', 'Bank Account Number') }}
+                <input type="text" name="bank_account_num" value="{{ form.get('bank_account_num', '') }}" class="{{ fcls('bank_account_num') }}" required>
+                {{ ffeedback('bank_account_num') }}
             </div>
             <div class="col-md-6 mb-3">
-                <label class="form-label">Bank Routing Number</label>
-                <input type="text" name="bank_routing_num" class="form-control" required>
+                {{ flabel('bank_routing_num', 'Bank Routing Number') }}
+                <input type="text" name="bank_routing_num" value="{{ form.get('bank_routing_num', '') }}" class="{{ fcls('bank_routing_num') }}" required>
+                {{ ffeedback('bank_routing_num') }}
             </div>
         </div>
-
-
         {% endif %}
             <button class="btn btn-primary w-100 mt-3">Register</button>
         </form>
     </div>
     </div>
-    <!-- JavaScript for Form Validation on Password and Email -->
     <script>
-        // want to set up an event listener so that it notifies the user whenever the passwords don't match
         const pswd = document.getElementById('password');
         const cpswd = document.getElementById('confirm_password');
-        const errPswd = document.getElementById('password-mismatch'); // this is to edit the message that pops up
-        
+        const errPswd = document.getElementById('password-mismatch');
+
         const pswd_check = () => {
-            if(cpswd.value == ''){ //if the confirm password has not been typed yet, it means that the user has not edited
-                errPswd.textContent = ''; //set errror message to nothing
+            if(cpswd.value == ''){
+                errPswd.textContent = '';
             }
             else if(pswd.value !== cpswd.value){
                 errPswd.textContent = "Passwords don't match, please try again."
             }
-            else{ //means that the passwords are matching
+            else{
                 errPswd.textContent = '';
             }
         }
         cpswd.addEventListener('input', pswd_check);
         pswd.addEventListener('input', pswd_check);
     </script>
-    
+
 {% endblock %}
