@@ -92,8 +92,12 @@ def dashboard():
 # Initial Step of Creating a Listing, Selecting a Category
 @seller_bp.route('/list_product', methods=['GET', 'POST'])
 def list_product():
-    # render the category selection for listing a product
-    categories = query_db('SELECT category_name FROM Categories ORDER BY category_name')
+    # BR-18: only leaf categories hold products — exclude any category that is someone's parent.
+    categories = query_db('''
+        SELECT category_name FROM Categories
+        WHERE category_name NOT IN (SELECT DISTINCT parent_category FROM Categories WHERE parent_category IS NOT NULL)
+        ORDER BY category_name
+    ''')
 
     if request.method == 'POST':
         category = request.form.get('category')
@@ -201,17 +205,24 @@ def list_product_review():
 @seller_bp.route('/edit_listing/<int:lid>', methods=['GET', 'POST'])
 def edit_listing(lid): #should pass in the listing id
     email = session['email']
-    #get the categories to pass in
-    categories = query_db('SELECT category_name FROM Categories ORDER BY category_name')
     #get the current listing, should be seller email and listing id
     cur_listing = query_db('''SELECT Listing_ID, Auction_Title, Product_Name, Product_Description, Category, Reserve_Price, Max_bids, Condition, Quantity, Status
         FROM Auction_Listings
         WHERE Seller_Email = ? AND Listing_ID = ?''', [email, lid], one=True) #should be one row
-    
+
     #if the current listing is not found
     if not cur_listing:
         flash('There has been an error, listing not found')
         return redirect(url_for('seller.dashboard'))
+
+    # BR-18: only leaf categories hold products. Include the listing's current category
+    # as an OR branch so legacy listings filed under a now-non-leaf category still render.
+    categories = query_db('''
+        SELECT category_name FROM Categories
+        WHERE category_name NOT IN (SELECT DISTINCT parent_category FROM Categories WHERE parent_category IS NOT NULL)
+           OR category_name = ?
+        ORDER BY category_name
+    ''', [cur_listing['Category']])
 
     # sold or inactive listings cannot be edited
     if cur_listing['Status'] != 1:
