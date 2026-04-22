@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% block title %}Nittany Auction - Pending User{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+
+        {% if status == 'pending' %}
+        <!-- Pending state: request is awaiting HelpDesk review -->
+        <div class="card shadow-sm p-4 text-center">
+            <h3 class="mb-3">Role Request Pending</h3>
+            <p class="text-muted mb-2">
+                Your role request is currently under review by a HelpDesk staff member.
+            </p>
+            <p class="mb-2">
+                <strong>Request ID:</strong> {{ last_request.request_id }}
+            </p>
+            <p class="mb-2">
+                <strong>Requested Role:</strong>
+                {% if requested_role %}{{ requested_role|capitalize }}{% else %}(unknown){% endif %}
+            </p>
+            <p class="mb-4">
+                <strong>Submitted As:</strong> {{ session['email'] }}
+            </p>
+            <p class="text-muted small mb-3">
+                You will be able to log in once your request is approved. Please check back later.
+            </p>
+            <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-secondary w-100">
+                <i class="bi bi-box-arrow-right me-1"></i>Log out
+            </a>
+        </div>
+        {% endif %}
+
+        {% if status == 'denied' %}
+        <!-- Denied state: show reason, then allow resubmission -->
+        <div class="card shadow-sm p-4 mb-4">
+            <h3 class="mb-3 text-center">Role Request Denied</h3>
+            <p class="mb-2 text-center">
+                Your previous role request (ID {{ last_request.request_id }}) was denied.
+            </p>
+            <div class="alert alert-warning mt-2 mb-0">
+                <strong>Reason:</strong>
+                {% if last_request.response_comment %}
+                    {{ last_request.response_comment }}
+                {% else %}
+                    (No reason provided.)
+                {% endif %}
+            </div>
+            <p class="text-muted small mt-3 mb-0 text-center">
+                You may review the feedback above and resubmit your request below.
+            </p>
+        </div>
+        {% endif %}
+
+        {% if status == 'new' %}
+        <!-- New state: welcome and invite selection -->
+        <div class="card shadow-sm p-4 mb-4 text-center">
+            <h3 class="mb-3">Welcome &mdash; Please Select a Role</h3>
+            <p class="text-muted mb-0">
+                Your account ({{ session['email'] }}) is active, but has not yet been assigned a
+                role. Please complete the form below to request either a Bidder or a Seller role.
+                A HelpDesk staff member will review your submission.
+            </p>
+        </div>
+        {% endif %}
+
+        {% if status == 'new' or status == 'denied' %}
+        <!-- Submission form (shown for new + denied states) -->
+        <div class="card shadow-sm p-4">
+            <form method="POST" action="{{ url_for('auth.pending_user') }}">
+                <h5 class="mb-3">Account Email</h5>
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-control" value="{{ session['email'] }}" readonly>
+                    <small class="text-muted">
+                        Your role request will be tied to this account.
+                    </small>
+                </div>
+
+                <h5 class="mt-4 mb-3">Requested Role</h5>
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input role-radio" type="radio"
+                               name="requested_role" id="role_bidder" value="bidder"
+                               {% if (prefill.get('requested_role') or 'bidder') == 'bidder' %}checked{% endif %}
+                               required>
+                        <label class="form-check-label" for="role_bidder">
+                            <i class="bi bi-hammer me-1"></i>Bidder
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input role-radio" type="radio"
+                               name="requested_role" id="role_seller" value="seller"
+                               {% if prefill.get('requested_role') == 'seller' %}checked{% endif %}
+                               required>
+                        <label class="form-check-label" for="role_seller">
+                            <i class="bi bi-shop me-1"></i>Seller
+                        </label>
+                    </div>
+                </div>
+
+                <h5 class="mt-4 mb-3">Personal Information</h5>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">First Name</label>
+                        <input type="text" name="first_name" class="form-control"
+                               value="{{ prefill.get('first_name', '') }}" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Last Name</label>
+                        <input type="text" name="last_name" class="form-control"
+                               value="{{ prefill.get('last_name', '') }}" required>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Age</label>
+                        <input type="number" name="age" class="form-control" min="1" max="120"
+                               value="{{ prefill.get('age', '') }}" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Major</label>
+                        <input type="text" name="major" class="form-control"
+                               value="{{ prefill.get('major', '') }}" required>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Phone</label>
+                        <input type="tel" name="phone" class="form-control"
+                               value="{{ prefill.get('phone', '') }}" required>
+                    </div>
+                </div>
+
+                <h5 class="mt-4 mb-3">Home Address</h5>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Street Number</label>
+                        <input type="text" name="street_num" class="form-control"
+                               value="{{ prefill.get('street_num', '') }}" required>
+                    </div>
+                    <div class="col-md-8 mb-3">
+                        <label class="form-label">Street Name</label>
+                        <input type="text" name="street_name" class="form-control"
+                               value="{{ prefill.get('street_name', '') }}" required>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Zipcode</label>
+                        <input type="text" name="zipcode" class="form-control"
+                               value="{{ prefill.get('zipcode', '') }}" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">City</label>
+                        <input type="text" name="city" class="form-control"
+                               value="{{ prefill.get('city', '') }}" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">State</label>
+                        <input type="text" name="state" class="form-control"
+                               value="{{ prefill.get('state', '') }}" required>
+                    </div>
+                </div>
+
+                <h5 class="mt-4 mb-3">Credit Card</h5>
+                <div class="row">
+                    <div class="col-md-8 mb-3">
+                        <label class="form-label">Card Number</label>
+                        <input type="text" name="credit_card_num" class="form-control"
+                               value="{{ prefill.get('credit_card_num', '') }}" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Card Type</label>
+                        <select name="card_type" class="form-select" required>
+                            {% set current_ct = prefill.get('card_type', '') %}
+                            <option value="Visa"             {% if current_ct == 'Visa' %}selected{% endif %}>Visa</option>
+                            <option value="MasterCard"       {% if current_ct == 'MasterCard' %}selected{% endif %}>MasterCard</option>
+                            <option value="American Express" {% if current_ct == 'American Express' %}selected{% endif %}>American Express</option>
+                            <option value="Discover"         {% if current_ct == 'Discover' %}selected{% endif %}>Discover</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Expire Month</label>
+                        <input type="number" name="expire_month" class="form-control"
+                               min="1" max="12"
+                               value="{{ prefill.get('expire_month', '') }}" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Expire Year</label>
+                        <input type="number" name="expire_year" class="form-control"
+                               min="2026" max="2050"
+                               value="{{ prefill.get('expire_year', '') }}" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Security Code</label>
+                        <input type="text" name="security_code" class="form-control"
+                               value="{{ prefill.get('security_code', '') }}" required>
+                    </div>
+                </div>
+
+                <!-- Seller-only banking fields: hidden by default; JS toggles visibility -->
+                <div class="seller-only {% if prefill.get('requested_role') != 'seller' %}d-none{% endif %}">
+                    <h5 class="mt-4 mb-3">Banking Information</h5>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Bank Routing Number</label>
+                            <input type="text" name="bank_routing_num" class="form-control"
+                                   value="{{ prefill.get('bank_routing_num', '') }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Bank Account Number</label>
+                            <input type="text" name="bank_account_num" class="form-control"
+                                   value="{{ prefill.get('bank_account_num', '') }}">
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 mt-3">
+                    Submit Role Request
+                </button>
+            </form>
+        </div>
+
+        <div class="text-center mt-3">
+            <a href="{{ url_for('auth.logout') }}" class="text-muted small">
+                <i class="bi bi-box-arrow-right me-1"></i>Log out
+            </a>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+{% if status == 'new' or status == 'denied' %}
+<script>
+    // Toggle seller-only banking fields when the requested role changes.
+    (function () {
+        const radios = document.querySelectorAll('.role-radio');
+        const sellerBlock = document.querySelector('.seller-only');
+        if (!sellerBlock) return;
+
+        function syncSellerBlock() {
+            const selected = document.querySelector('.role-radio:checked');
+            if (selected && selected.value === 'seller') {
+                sellerBlock.classList.remove('d-none');
+            } else {
+                sellerBlock.classList.add('d-none');
+            }
+        }
+
+        radios.forEach(function (r) {
+            r.addEventListener('change', syncSellerBlock);
+        });
+        syncSellerBlock();
+    })();
+</script>
+{% endif %}
+{% endblock %}

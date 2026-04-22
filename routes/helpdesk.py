@@ -1,3 +1,5 @@
+import uuid
+
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from db import get_db, query_db, parse_request_desc, HELPDESK_TEAM_EMAIL
 from notifications import notify
@@ -124,16 +126,23 @@ def handle_request(rid):
     db = get_db()
 
     if action == 'deny':
+        deny_reason = request.form.get('response_comment', '').strip()
+        if not deny_reason:
+            flash('A reason is required when denying.')
+            return redirect(url_for('helpdesk.queue'))
         db.execute(
-            'UPDATE Requests SET request_status = 2 WHERE request_id = ?', [rid]
+            'UPDATE Requests SET request_status = 2, response_comment = ?, response_at = CURRENT_TIMESTAMP WHERE request_id = ?',
+            [deny_reason, rid],
         )
         notify(
             req['sender_email'], 'request_denied',
-            f'Your request #{rid} ({req["request_type"]}) was denied by HelpDesk staff.',
+            f'Your request #{rid} ({req["request_type"]}) was denied by HelpDesk staff. Reason: {deny_reason}',
         )
         db.commit()
         flash(f'Request #{rid} denied.')
         return redirect(url_for('helpdesk.queue'))
+
+    approve_comment = request.form.get('response_comment', '').strip()
 
     handler = _REQUEST_HANDLERS.get(req['request_type'])
     if handler:
@@ -143,8 +152,13 @@ def handle_request(rid):
             return redirect(url_for('helpdesk.queue'))
 
     db.execute(
-        'UPDATE Requests SET request_status = 1 WHERE request_id = ?', [rid]
+        'UPDATE Requests SET request_status = 1, response_comment = ?, response_at = CURRENT_TIMESTAMP WHERE request_id = ?',
+        [approve_comment or None, rid],
     )
+    msg = f'Your request #{rid} ({req["request_type"]}) was approved by HelpDesk staff.'
+    if approve_comment:
+        msg += f' Note: {approve_comment}'
+    notify(req['sender_email'], 'request_approved', msg)
     db.commit()
     flash(f'Request #{rid} completed.')
     return redirect(url_for('helpdesk.queue'))
@@ -229,7 +243,6 @@ def _handle_change_id(db, req):
         ('Rating', 'Seller_Email'),
         ('Questions', 'Bidder_Email'),
         ('Questions', 'Seller_Email'),
-        ('Watchlist', 'Bidder_Email'),
         ('Shopping_Cart', 'Bidder_Email'),
         ('Shopping_Cart', 'Seller_Email'),
         ('Local_Vendors', 'email'),
@@ -277,11 +290,71 @@ def _handle_become_seller(db, req):
     return None
 
 
+def _handle_pending_role(db, req):
+    sender = req['sender_email']
+    parts = parse_request_desc(req['request_desc'])
+    requested_role = (parts.get('requested_role') or '').strip().lower()
+
+    if requested_role not in ('bidder', 'seller'):
+        return 'Invalid requested role on this application.'
+
+    # Guard: applicant might have been given a role in the meantime.
+    if query_db('SELECT 1 FROM Bidders WHERE email = ?', [sender], one=True):
+        return 'Applicant already has a role.'
+
+    required = ['first_name', 'last_name', 'phone', 'street_num', 'street_name',
+                'zipcode', 'city', 'state', 'credit_card_num', 'card_type',
+                'expire_month', 'expire_year', 'security_code']
+    if requested_role == 'seller':
+        required += ['bank_routing_num', 'bank_account_num']
+    missing = [f for f in required if not (parts.get(f) or '').strip()]
+    if missing:
+        return 'Application is missing required fields: ' + ', '.join(missing)
+
+    if query_db('SELECT 1 FROM Credit_Cards WHERE credit_card_num = ?',
+                [parts['credit_card_num']], one=True):
+        return 'Cards cannot be shared across accounts — this card is already registered to another user.'
+
+    address_id = uuid.uuid4().hex
+    db.execute(
+        'INSERT OR IGNORE INTO Zipcode_Info (zipcode, city, state) VALUES (?, ?, ?)',
+        [parts['zipcode'], parts['city'], parts['state']],
+    )
+    db.execute(
+        'INSERT INTO Address (address_id, zipcode, street_num, street_name) VALUES (?, ?, ?, ?)',
+        [address_id, parts['zipcode'], parts['street_num'], parts['street_name']],
+    )
+    db.execute(
+        'INSERT INTO Bidders (email, first_name, last_name, age, home_address_id, major, phone) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [sender, parts['first_name'], parts['last_name'],
+         parts.get('age') or None, address_id, parts.get('major'), parts['phone']],
+    )
+    db.execute(
+        'INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email) '
+        'VALUES (?, ?, ?, ?, ?, ?)',
+        [parts['credit_card_num'], parts['card_type'], parts['expire_month'],
+         parts['expire_year'], parts['security_code'], sender],
+    )
+    if requested_role == 'seller':
+        db.execute(
+            'INSERT INTO Sellers (email, bank_routing_number, bank_account_number) VALUES (?, ?, ?)',
+            [sender, parts['bank_routing_num'], parts['bank_account_num']],
+        )
+
+    notify(
+        sender, 'role_approved',
+        f'Your role request was approved. You can now log in as {requested_role}.',
+    )
+    return None
+
+
 _REQUEST_HANDLERS = {
     'AddCategory': _handle_add_category,
     'ChangeID': _handle_change_id,
     'MarketAnalysis': _handle_market_analysis,
     'BecomeSeller': _handle_become_seller,
+    'PendingRole': _handle_pending_role,
 }
 
 

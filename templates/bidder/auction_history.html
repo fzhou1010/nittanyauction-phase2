@@ -21,14 +21,15 @@
     <div class="alert alert-light text-center py-4">You haven't won any auctions yet.</div>
 {% else %}
     <div class="table-responsive mb-4">
-        <table class="table align-middle">
+        <table class="table align-middle text-center">
             <thead>
                 <tr>
-                    <th>Listing</th>
-                    <th>Seller</th>
-                    <th>Winning Bid</th>
-                    <th>Sold On</th>
-                    <th>Payment</th>
+                    <th class="text-center">Listing</th>
+                    <th class="text-center">Seller</th>
+                    <th class="text-center">Winning Bid</th>
+                    <th class="text-center">Sold On</th>
+                    <th class="text-center">Payment</th>
+                    <th class="text-center">Rating</th>
                 </tr>
             </thead>
             <tbody>
@@ -56,6 +57,16 @@
                             <span class="badge bg-warning text-dark">Unpaid</span>
                         {% endif %}
                     </td>
+                    <td>
+                        {% if w.can_rate %}
+                            <a href="{{ url_for('bidder.rate_seller', seller_email=w.Seller_Email, listing_id=w.Listing_ID) }}"
+                               class="btn btn-sm btn-outline-primary">Rate Seller</a>
+                        {% elif w.already_rated %}
+                            <span class="badge bg-light text-dark">Rated</span>
+                        {% else %}
+                            <span class="text-muted small">Pay to rate</span>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -69,15 +80,15 @@
     <div class="alert alert-light text-center py-4">You haven't placed any bids yet.</div>
 {% else %}
     <div class="table-responsive">
-        <table class="table align-middle">
+        <table class="table align-middle text-center">
             <thead>
                 <tr>
-                    <th>Listing</th>
-                    <th>Seller</th>
-                    <th>Your Top Bid</th>
-                    <th>Current Bid</th>
-                    <th>Status</th>
-                    <th>Standing</th>
+                    <th class="text-center">Listing</th>
+                    <th class="text-center">Seller</th>
+                    <th class="text-center">Your Top Bid</th>
+                    <th class="text-center">Current Bid</th>
+                    <th class="text-center">Status</th>
+                    <th class="text-center">Standing</th>
                 </tr>
             </thead>
             <tbody>

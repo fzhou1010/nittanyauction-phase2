@@ -5,7 +5,7 @@ import sqlite3 as sql
 import uuid # use uuid for generating an hex id for the address
 import hashlib
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from db import get_db, query_db
+from db import get_db, query_db, format_request_desc, parse_request_desc, HELPDESK_TEAM_EMAIL
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -43,6 +43,11 @@ def login():
 
         available_roles = get_user_roles(email)
 
+        if not available_roles:
+            # Role-less account - direct to Pending User flow to submit a role request.
+            session['available_roles'] = []
+            return redirect(url_for('auth.pending_user'))
+
         if len(available_roles) == 1:
             role = available_roles[0]
             session['roles'] = available_roles
@@ -78,6 +83,205 @@ def set_role(role):
         else:
             return redirect(url_for(f'{role}.welcome'))
     return redirect(url_for('auth.login'))
+
+def _build_pending_prefill(email, last_request):
+    # Pull whatever we already know about this email from prior state so the user
+    # doesn't have to retype on resubmit. Priority: prior PendingRole payload,
+    # then any partial Bidders / Address / Credit_Cards / Sellers rows (covers
+    # edge cases like a previously-approved account that got re-orphaned).
+    prefill = {}
+    if last_request is not None:
+        for k, v in parse_request_desc(last_request['request_desc']).items():
+            if v not in (None, ''):
+                prefill[k] = v
+
+    bidder = query_db('SELECT * FROM Bidders WHERE email = ?', [email], one=True)
+    if bidder:
+        for field in ('first_name', 'last_name', 'age', 'major', 'phone'):
+            val = bidder[field]
+            if val not in (None, '') and not prefill.get(field):
+                prefill[field] = val
+        if bidder['home_address_id']:
+            addr = query_db(
+                'SELECT a.*, z.city, z.state FROM Address a '
+                'LEFT JOIN Zipcode_Info z ON a.zipcode = z.zipcode '
+                'WHERE a.address_id = ?',
+                [bidder['home_address_id']], one=True,
+            )
+            if addr:
+                for field in ('street_num', 'street_name', 'zipcode', 'city', 'state'):
+                    val = addr[field]
+                    if val not in (None, '') and not prefill.get(field):
+                        prefill[field] = val
+
+    cc = query_db(
+        'SELECT * FROM Credit_Cards WHERE Owner_email = ? LIMIT 1',
+        [email], one=True,
+    )
+    if cc:
+        for field in ('credit_card_num', 'card_type', 'expire_month', 'expire_year', 'security_code'):
+            val = cc[field]
+            if val not in (None, '') and not prefill.get(field):
+                prefill[field] = val
+
+    seller = query_db('SELECT * FROM Sellers WHERE email = ?', [email], one=True)
+    if seller:
+        if not prefill.get('bank_routing_num') and seller['bank_routing_number']:
+            prefill['bank_routing_num'] = seller['bank_routing_number']
+        if not prefill.get('bank_account_num') and seller['bank_account_number']:
+            prefill['bank_account_num'] = seller['bank_account_number']
+
+    return prefill
+
+
+@auth_bp.route('/pending_user', methods=['GET', 'POST'])
+def pending_user():
+    # Guard: require an authenticated session.
+    if 'email' not in session:
+        return redirect(url_for('auth.login'))
+
+    email = session['email']
+
+    # Role may have been approved since this session was established (e.g. user
+    # refreshes the pending page after HelpDesk clicks Complete). Refresh the
+    # session's role cache and route them into their new welcome flow instead
+    # of sending them back through /login.
+    current_roles = get_user_roles(email)
+    if current_roles:
+        session['roles'] = current_roles
+        session['available_roles'] = current_roles
+        if len(current_roles) == 1:
+            role = current_roles[0]
+            session['role'] = role
+            flash('Your role has been approved. Welcome!')
+            if role == 'seller':
+                return redirect(url_for('seller.dashboard'))
+            return redirect(url_for(f'{role}.welcome'))
+        # Multi-role (e.g. seller approval inserts into both Bidders and Sellers).
+        flash('Your role has been approved. Please choose which role to use.')
+        return redirect(url_for('auth.choose_role'))
+
+    db = get_db()
+
+    # Find the most recent PendingRole request (if any) for this user.
+    last_request = query_db(
+        'SELECT * FROM Requests '
+        'WHERE sender_email = ? AND request_type = ? '
+        'ORDER BY request_id DESC LIMIT 1',
+        [email, 'PendingRole'], one=True)
+
+    # Any currently-open pending request (status=0) blocks new submissions.
+    open_request = None
+    if last_request is not None and last_request['request_status'] == 0:
+        open_request = last_request
+
+    if request.method == 'POST':
+        # Block if already-open pending request.
+        if open_request is not None:
+            flash('You already have a pending role request.')
+            parsed = parse_request_desc(open_request['request_desc'])
+            return render_template(
+                'auth/pending_user.html',
+                status='pending',
+                last_request=open_request,
+                requested_role=parsed.get('requested_role'),
+                prefill={},
+            )
+
+        requested_role = (request.form.get('requested_role') or '').strip().lower()
+        if requested_role not in ('bidder', 'seller'):
+            flash('Please select a valid role (bidder or seller).')
+            # Decide render state based on prior history.
+            if last_request is not None and last_request['request_status'] == 2:
+                status = 'denied'
+            else:
+                status = 'new'
+            return render_template(
+                'auth/pending_user.html',
+                status=status,
+                last_request=last_request,
+                requested_role=None,
+                prefill=request.form.to_dict(),
+            )
+
+        # Required field set per role - mirrors register_form() for consistency.
+        required = [
+            'first_name', 'last_name', 'age', 'major', 'phone',
+            'street_num', 'street_name', 'zipcode', 'city', 'state',
+            'credit_card_num', 'card_type', 'expire_month', 'expire_year',
+            'security_code',
+        ]
+        if requested_role == 'seller':
+            required = required + ['bank_routing_num', 'bank_account_num']
+
+        missing = [f for f in required if not (request.form.get(f) or '').strip()]
+        if missing:
+            flash('Please fill in all required fields: ' + ', '.join(missing))
+            if last_request is not None and last_request['request_status'] == 2:
+                status = 'denied'
+            else:
+                status = 'new'
+            return render_template(
+                'auth/pending_user.html',
+                status=status,
+                last_request=last_request,
+                requested_role=None,
+                prefill=request.form.to_dict(),
+            )
+
+        # Build payload fields (always personal+address+cc; bank only for seller).
+        payload = {'requested_role': requested_role}
+        for f in (
+            'first_name', 'last_name', 'age', 'major', 'phone',
+            'street_num', 'street_name', 'zipcode', 'city', 'state',
+            'credit_card_num', 'card_type', 'expire_month', 'expire_year',
+            'security_code',
+        ):
+            payload[f] = request.form.get(f, '').strip()
+        if requested_role == 'seller':
+            payload['bank_routing_num'] = request.form.get('bank_routing_num', '').strip()
+            payload['bank_account_num'] = request.form.get('bank_account_num', '').strip()
+
+        # Compute next request_id via MAX+1 (same pattern as seller.request_category).
+        cur_id = query_db('SELECT MAX(request_id) AS cur_id FROM Requests', one=True)
+        next_id = (cur_id['cur_id'] or 0) + 1
+
+        db.execute(
+            'INSERT INTO Requests '
+            '(request_id, sender_email, helpdesk_staff_email, request_type, request_desc, request_status) '
+            'VALUES (?, ?, ?, ?, ?, ?)',
+            [next_id, email, HELPDESK_TEAM_EMAIL, 'PendingRole',
+             format_request_desc(**payload), 0])
+        db.commit()
+
+        flash('Role request submitted. A HelpDesk staff member will review it.')
+        return redirect(url_for('auth.pending_user'))
+
+    # GET: decide which state to render.
+    if open_request is not None:
+        parsed = parse_request_desc(open_request['request_desc'])
+        return render_template(
+            'auth/pending_user.html',
+            status='pending',
+            last_request=open_request,
+            requested_role=parsed.get('requested_role'),
+            prefill={},
+        )
+    if last_request is not None and last_request['request_status'] == 2:
+        return render_template(
+            'auth/pending_user.html',
+            status='denied',
+            last_request=last_request,
+            requested_role=None,
+            prefill=_build_pending_prefill(email, last_request),
+        )
+    return render_template(
+        'auth/pending_user.html',
+        status='new',
+        last_request=None,
+        requested_role=None,
+        prefill=_build_pending_prefill(email, None),
+    )
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
@@ -118,6 +322,12 @@ def register_form(role):
         # we want to get the corresponding data for the specific roles
         db = get_db()
         if role == 'bidder':
+            required = ['first_name', 'last_name', 'phone', 'street_num', 'street_name', 'zipcode', 'city', 'state',
+                        'credit_card_num', 'card_type', 'expire_month', 'expire_year', 'security_code']
+            missing = [f for f in required if not request.form.get(f, '').strip()]
+            if missing:
+                flash('Please fill in all required fields: ' + ', '.join(missing))
+                return render_template('auth/register_form.html', role=role)
             first_name = request.form['first_name']
             last_name = request.form['last_name']
             age = request.form.get('age') # we can use .get from the forms as these fields are not mandatory to the user signing up to use the page
@@ -134,6 +344,9 @@ def register_form(role):
             expire_month = request.form['expire_month']
             expire_year = request.form['expire_year']
             security_code = request.form['security_code']
+            if query_db('SELECT 1 FROM Credit_Cards WHERE credit_card_num = ?', [credit_card_num], one=True):
+                flash('Cards cannot be shared across accounts — this card is already registered to another user.')
+                return render_template('auth/register_form.html', role=role)
             try:
                 # the order of insert into matters, as we want don;t want an integrity error
                 db.execute('INSERT INTO Users (email, password) VALUES (?, ?)', [email, hashed_pswd])
@@ -161,6 +374,13 @@ def register_form(role):
                 return render_template('auth/register_form.html', role=role)
             
         elif role == 'student_seller':
+            required = ['first_name', 'last_name', 'phone', 'street_num', 'street_name', 'zipcode', 'city', 'state',
+                        'credit_card_num', 'card_type', 'expire_month', 'expire_year', 'security_code',
+                        'bank_account_num', 'bank_routing_num']
+            missing = [f for f in required if not request.form.get(f, '').strip()]
+            if missing:
+                flash('Please fill in all required fields: ' + ', '.join(missing))
+                return render_template('auth/register_form.html', role=role)
             first_name = request.form['first_name']
             last_name = request.form['last_name']
             age = request.form.get('age') # we can use .get from the forms as these fields are not mandatory to the user signing up to use the page
@@ -179,6 +399,9 @@ def register_form(role):
             expire_month = request.form['expire_month']
             expire_year = request.form['expire_year']
             security_code = request.form['security_code']
+            if query_db('SELECT 1 FROM Credit_Cards WHERE credit_card_num = ?', [credit_card_num], one=True):
+                flash('Cards cannot be shared across accounts — this card is already registered to another user.')
+                return render_template('auth/register_form.html', role=role)
             try:
                 # the order of insert into matters, as we want don;t want an integrity error
                 db.execute('INSERT INTO Users (email, password) VALUES (?, ?)', [email, hashed_pswd])
@@ -202,6 +425,12 @@ def register_form(role):
                 flash('Error saving information into the database.')
                 return render_template('auth/register_form.html', role=role)
         else: #means that the role is local_vendor
+            required = ['business_name', 'cs_phone_num', 'street_num', 'street_name', 'zipcode', 'city', 'state',
+                        'bank_account_num', 'bank_routing_num']
+            missing = [f for f in required if not request.form.get(f, '').strip()]
+            if missing:
+                flash('Please fill in all required fields: ' + ', '.join(missing))
+                return render_template('auth/register_form.html', role=role)
             business_name = request.form['business_name']
             cs_phone_num = request.form['cs_phone_num']
             #business address information, saved to the address table
@@ -258,30 +487,58 @@ def profile():
     role = session.get('role')
     db = get_db()
 
-    # Always try Bidders first for name info since student sellers are in both tables
-    user_info = query_db('''
-        SELECT first_name, last_name, age, major, home_address_id 
+    # Bidders row drives both the name display (when applicable) and the home-address FK
+    # for student sellers; we always fetch it up front so both the seller and bidder paths
+    # can reuse it.
+    bidder_row = query_db('''
+        SELECT first_name, last_name, age, major, home_address_id
         FROM Bidders WHERE email = ?''', [user_email], one=True)
+    vendor_row = query_db(
+        'SELECT business_address_id FROM Local_Vendors WHERE email = ?',
+        [user_email], one=True)
 
-    # Get address_id based on role
+    # Resolve (user_info, address_id, address_label, address_owner) per role.
+    # address_owner tells the POST branch which FK to update when we create a
+    # brand-new Address row: 'bidder' → Bidders.home_address_id, 'vendor' → Local_Vendors.business_address_id.
     if role == 'seller':
-        vendor_info = query_db('SELECT business_address_id FROM Local_Vendors WHERE email = ?', [user_email], one=True)
-        address_id = vendor_info['business_address_id'] if vendor_info else None
-        # fall back to bidder address if they're also a bidder
-        if not address_id and user_info:
-            address_id = user_info['home_address_id']
+        if vendor_row:
+            # Local vendor: business address lives on Local_Vendors.
+            user_info = bidder_row  # may be None; template guards with "if user"
+            address_id = vendor_row['business_address_id']
+            address_label = 'Business Address'
+            address_owner = 'vendor'
+        else:
+            # Student seller: address lives on Bidders (student sellers are also bidders).
+            user_info = bidder_row
+            address_id = bidder_row['home_address_id'] if bidder_row else None
+            address_label = 'Home Address'
+            address_owner = 'bidder'
     elif role == 'helpdesk':
         user_info = query_db('SELECT email, position FROM Helpdesk WHERE email = ?', [user_email], one=True)
-        # helpdesk may also be a bidder or seller, try to get their address from those tables
-        bidder_info = query_db('SELECT first_name, last_name, home_address_id FROM Bidders WHERE email = ?', [user_email], one=True)
-        if bidder_info:
-            user_info = bidder_info  # use bidder info for name display too
-            address_id = bidder_info['home_address_id']
+        # Helpdesk staff may also hold a bidder/vendor identity; surface whichever address exists.
+        if bidder_row:
+            user_info = bidder_row
+            address_id = bidder_row['home_address_id']
+            address_label = 'Home Address'
+            address_owner = 'bidder'
+        elif vendor_row:
+            address_id = vendor_row['business_address_id']
+            address_label = 'Business Address'
+            address_owner = 'vendor'
         else:
-            seller_info = query_db('SELECT home_address_id FROM Sellers WHERE email = ?', [user_email], one=True)
-            address_id = seller_info['home_address_id'] if seller_info else None
+            address_id = None
+            address_label = 'Mailing Address'
+            address_owner = None
     else:  # bidder
-        address_id = user_info['home_address_id'] if user_info else None
+        user_info = bidder_row
+        address_id = bidder_row['home_address_id'] if bidder_row else None
+        address_label = 'Home Address'
+        address_owner = 'bidder'
+
+    # Payment Methods tab is only meaningful for users who exist in Bidders (schema 3.5:
+    # Credit_Cards.Owner_email → Bidders.email). Pure local vendors can't own a CC, so
+    # we hide the tab for them.
+    can_manage_cards = bidder_row is not None
 
     address_info = None
     if address_id:
@@ -311,18 +568,20 @@ def profile():
                 db.execute('''UPDATE Address SET street_num = ?, street_name = ?, zipcode = ?
                             WHERE address_id = ?''',
                             [street_num, street_name, zipcode, address_id])
-            else:
+            elif address_owner:
                 new_address_id = uuid.uuid4().hex
                 db.execute('INSERT INTO Address (address_id, zipcode, street_num, street_name) VALUES (?, ?, ?, ?)',
                         [new_address_id, zipcode, street_num, street_name])
-                if user_info:  # bidder or student seller
-                    db.execute('UPDATE Bidders SET home_address_id = ? WHERE email = ?', 
+                if address_owner == 'bidder':
+                    db.execute('UPDATE Bidders SET home_address_id = ? WHERE email = ?',
                             [new_address_id, user_email])
-                elif role == 'seller':
-                    is_vendor = query_db('SELECT 1 FROM Local_Vendors WHERE email = ?', [user_email], one=True)
-                    if is_vendor:
-                        db.execute('UPDATE Local_Vendors SET business_address_id = ? WHERE email = ?', 
-                                [new_address_id, user_email])
+                elif address_owner == 'vendor':
+                    db.execute('UPDATE Local_Vendors SET business_address_id = ? WHERE email = ?',
+                            [new_address_id, user_email])
+            else:
+                db.commit()
+                flash('No address record exists for this account.', 'danger')
+                return redirect(url_for('auth.profile'))
             db.commit()
             flash('Address updated successfully!', 'success')
 
@@ -340,22 +599,31 @@ def profile():
                 flash('Incorrect current password.', 'danger')
 
         elif form_type == 'add_card':
-            credit_card_num = request.form.get('credit_card_num')
-            card_type = request.form.get('card_type')
+            if not can_manage_cards:
+                flash('Credit cards can only be added to bidder accounts.', 'danger')
+                return redirect(url_for('auth.profile'))
+            credit_card_num = (request.form.get('credit_card_num') or '').strip()
+            card_type = (request.form.get('card_type') or '').strip()
             expire_month = request.form.get('expire_month')
             expire_year = request.form.get('expire_year')
-            security_code = request.form.get('security_code')
+            security_code = (request.form.get('security_code') or '').strip()
 
-            existing_card = query_db('SELECT 1 FROM Credit_Cards WHERE credit_card_num = ?', [credit_card_num], one=True)
-
-            if existing_card:
-                flash('This credit card number is already associated with an account.', 'danger')
+            mine = query_db(
+                'SELECT 1 FROM Credit_Cards WHERE credit_card_num = ? AND Owner_email = ?',
+                [credit_card_num, user_email], one=True,
+            )
+            if mine:
+                flash('You already have that card on your account.', 'danger')
             else:
-                db.execute('''INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email) 
-                VALUES (?, ?, ?, ?, ?, ?)''',
-                [credit_card_num, card_type, expire_month, expire_year, security_code, user_email])
-                db.commit()
-                flash('Card added successfully!', 'success')
+                try:
+                    db.execute('''
+                        INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email)
+                        VALUES (?, ?, ?, ?, ?, ?)''',
+                        [credit_card_num, card_type, expire_month, expire_year, security_code, user_email])
+                    db.commit()
+                    flash('Card added successfully!', 'success')
+                except sql.IntegrityError:
+                    flash('Cards cannot be shared across accounts — this card is already registered to another user.', 'danger')
 
         elif form_type == 'remove_card':
             card_num = request.form.get('credit_card_num', '').strip()
@@ -372,7 +640,14 @@ def profile():
 
         return redirect(url_for('auth.profile'))
 
-    return render_template('auth/profile.html', user=user_info, address=address_info, cards=cards)
+    return render_template(
+        'auth/profile.html',
+        user=user_info,
+        address=address_info,
+        address_label=address_label,
+        cards=cards,
+        can_manage_cards=can_manage_cards,
+    )
 
 
 @auth_bp.route('/profile/changeID', methods=['POST'])

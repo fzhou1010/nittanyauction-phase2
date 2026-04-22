@@ -26,7 +26,7 @@
                     {% if question['answered'] == 1 %} <!-- Display response to question and option to edit answer-->
                         <p><strong>Your Answer:</strong></p>
                         <p>{{question['answer_text']}}</p>
-                        <small class="text-muted mb-3">{{session['email']}}</small>
+                        <small class="text-muted mb-3">{{session['email']}} - {{question['answer_time']}}</small>
                         <hr>
                         <p>Update your answer:</p>
                         <form method="POST" action="{{url_for('seller.question', qid=question['question_id'])}}">
