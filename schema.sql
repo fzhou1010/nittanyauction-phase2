@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS Bidders (
     age INTEGER,
     home_address_id TEXT,
     major TEXT,
+    phone TEXT,
     PRIMARY KEY (email),
     FOREIGN KEY (email) REFERENCES Users(email),
     FOREIGN KEY (home_address_id) REFERENCES Address(address_id)

@@ -44,11 +44,14 @@ def login():
         available_roles = get_user_roles(email)
 
         if len(available_roles) == 1:
-            session['roles'] = available_roles[0]
-            if session['roles'] == 'seller':
-                return redirect(url_for(f'{available_roles[0]}.dashboard'))
+            role = available_roles[0]
+            session['roles'] = available_roles
+            session['role'] = role
+            session['available_roles'] = available_roles
+            if role == 'seller':
+                return redirect(url_for('seller.dashboard'))
             else:
-                return redirect(url_for(f'{available_roles[0]}.welcome'))
+                return redirect(url_for(f'{role}.welcome'))
         else:
             session['available_roles'] = available_roles
             return redirect(url_for('auth.choose_role'))
@@ -68,9 +71,10 @@ def set_role(role):
     if 'email' not in session:
         return redirect(url_for('auth.login'))
     if role in session.get('available_roles', []):
-        session['roles'] = role
+        session['roles'] = [role]
+        session['role'] = role
         if role == 'seller':
-            return redirect(url_for(f'{role}.dashboard'))
+            return redirect(url_for('seller.dashboard'))
         else:
             return redirect(url_for(f'{role}.welcome'))
     return redirect(url_for('auth.login'))
@@ -118,12 +122,18 @@ def register_form(role):
             last_name = request.form['last_name']
             age = request.form.get('age') # we can use .get from the forms as these fields are not mandatory to the user signing up to use the page
             major = request.form.get('major')
+            phone = request.form['phone']
             street_num = request.form['street_num']
             street_name = request.form['street_name']
             zipcode = request.form['zipcode']
             city = request.form['city']
             state = request.form['state']
             address_id = uuid.uuid4().hex # generate a hex id for the address
+            credit_card_num = request.form['credit_card_num']
+            card_type = request.form['card_type']
+            expire_month = request.form['expire_month']
+            expire_year = request.form['expire_year']
+            security_code = request.form['security_code']
             try:
                 # the order of insert into matters, as we want don;t want an integrity error
                 db.execute('INSERT INTO Users (email, password) VALUES (?, ?)', [email, hashed_pswd])
@@ -131,11 +141,17 @@ def register_form(role):
                 db.execute('INSERT OR IGNORE INTO Zipcode_Info (zipcode, city, state) VALUES (?, ?, ?)', [zipcode, city, state])
                 db.execute('INSERT INTO Address (address_id, zipcode, street_num, street_name) VALUES (?, ?, ?, ?)',
                             [address_id, zipcode, street_num, street_name])
-                db.execute('INSERT INTO Bidders (email, first_name, last_name, age, home_address_id, major) VALUES (?, ?, ?, ?, ?, ?)', 
-                           [email, first_name, last_name, age, address_id, major])
+                db.execute('INSERT INTO Bidders (email, first_name, last_name, age, home_address_id, major, phone) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                           [email, first_name, last_name, age, address_id, major, phone])
+                # Credit_Cards FK -> Bidders(email), so this must follow the Bidders insert
+                db.execute('INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email) VALUES (?, ?, ?, ?, ?, ?)',
+                           [credit_card_num, card_type, expire_month, expire_year, security_code, email])
                 db.commit()
                 session['email'] = email
-                session['roles'] = get_user_roles(email)
+                user_roles = get_user_roles(email)
+                session['roles'] = user_roles
+                session['role'] = 'bidder'
+                session['available_roles'] = user_roles
                 return redirect(url_for('bidder.welcome'))
 
             #except Exception as e:
@@ -149,6 +165,7 @@ def register_form(role):
             last_name = request.form['last_name']
             age = request.form.get('age') # we can use .get from the forms as these fields are not mandatory to the user signing up to use the page
             major = request.form.get('major')
+            phone = request.form['phone']
             street_num = request.form['street_num']
             street_name = request.form['street_name']
             zipcode = request.form['zipcode']
@@ -157,19 +174,29 @@ def register_form(role):
             address_id = uuid.uuid4().hex # generate a hex id for the address
             bank_account_num = request.form['bank_account_num']
             bank_routing_num = request.form['bank_routing_num']
+            credit_card_num = request.form['credit_card_num']
+            card_type = request.form['card_type']
+            expire_month = request.form['expire_month']
+            expire_year = request.form['expire_year']
+            security_code = request.form['security_code']
             try:
                 # the order of insert into matters, as we want don;t want an integrity error
                 db.execute('INSERT INTO Users (email, password) VALUES (?, ?)', [email, hashed_pswd])
                 db.execute('INSERT OR IGNORE INTO Zipcode_Info (zipcode, city, state) VALUES (?, ?, ?)', [zipcode, city, state])
                 db.execute('INSERT INTO Address (address_id, zipcode, street_num, street_name) VALUES (?, ?, ?, ?)',
                             [address_id, zipcode, street_num, street_name])
-                db.execute('INSERT INTO Bidders (email, first_name, last_name, age, home_address_id, major) VALUES (?, ?, ?, ?, ?, ?)', 
-                           [email, first_name, last_name, age, address_id, major]) # since student sellers are also bidders by default, they also need to be entered into the bidders relation
-                db.execute('INSERT INTO Sellers (email, bank_routing_number, bank_account_number) VALUES (?, ?, ?)', 
+                db.execute('INSERT INTO Bidders (email, first_name, last_name, age, home_address_id, major, phone) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                           [email, first_name, last_name, age, address_id, major, phone]) # since student sellers are also bidders by default, they also need to be entered into the bidders relation
+                db.execute('INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email) VALUES (?, ?, ?, ?, ?, ?)',
+                           [credit_card_num, card_type, expire_month, expire_year, security_code, email])
+                db.execute('INSERT INTO Sellers (email, bank_routing_number, bank_account_number) VALUES (?, ?, ?)',
                            [email, bank_routing_num, bank_account_num]) #we want the balance to be set to default in the schema, therefore we don't include a value here
                 db.commit()
                 session['email'] = email
-                session['roles'] = get_user_roles(email)
+                user_roles = get_user_roles(email)
+                session['roles'] = user_roles
+                session['role'] = 'seller'
+                session['available_roles'] = user_roles
                 return redirect(url_for('seller.welcome'))
             except sql.IntegrityError:
                 flash('Error saving information into the database.')
@@ -200,7 +227,10 @@ def register_form(role):
                 db.commit()
                 print('commit successful')
                 session['email'] = email
-                session['roles'] = get_user_roles(email)
+                user_roles = get_user_roles(email)
+                session['roles'] = user_roles
+                session['role'] = 'seller'
+                session['available_roles'] = user_roles
                 return redirect(url_for('seller.welcome')) #Todo: Make a local vendor welcome page, or should it be the same as the seller page
             except sql.IntegrityError:
                 flash('Error saving information into the database.')
