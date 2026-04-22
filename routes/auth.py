@@ -1,4 +1,4 @@
-# auth.py — Handles login, logout, registration, and profile routes.
+# auth.py - login, logout, registration, profile
 
 import re
 import sqlite3 as sql
@@ -85,10 +85,7 @@ def set_role(role):
     return redirect(url_for('auth.login'))
 
 def _build_pending_prefill(email, last_request):
-    # Pull whatever we already know about this email from prior state so the user
-    # doesn't have to retype on resubmit. Priority: prior PendingRole payload,
-    # then any partial Bidders / Address / Credit_Cards / Sellers rows (covers
-    # edge cases like a previously-approved account that got re-orphaned).
+    # prefill anything we already know so they don't retype
     prefill = {}
     if last_request is not None:
         for k, v in parse_request_desc(last_request['request_desc']).items():
@@ -142,10 +139,7 @@ def pending_user():
 
     email = session['email']
 
-    # Role may have been approved since this session was established (e.g. user
-    # refreshes the pending page after HelpDesk clicks Complete). Refresh the
-    # session's role cache and route them into their new welcome flow instead
-    # of sending them back through /login.
+    # if their role got approved since page load, bounce to the welcome flow
     current_roles = get_user_roles(email)
     if current_roles:
         session['roles'] = current_roles
@@ -487,9 +481,7 @@ def profile():
     role = session.get('role')
     db = get_db()
 
-    # Bidders row drives both the name display (when applicable) and the home-address FK
-    # for student sellers; we always fetch it up front so both the seller and bidder paths
-    # can reuse it.
+    # grab the bidders row up front, both seller and bidder paths need it
     bidder_row = query_db('''
         SELECT first_name, last_name, age, major, home_address_id
         FROM Bidders WHERE email = ?''', [user_email], one=True)
@@ -497,9 +489,7 @@ def profile():
         'SELECT business_address_id FROM Local_Vendors WHERE email = ?',
         [user_email], one=True)
 
-    # Resolve (user_info, address_id, address_label, address_owner) per role.
-    # address_owner tells the POST branch which FK to update when we create a
-    # brand-new Address row: 'bidder' → Bidders.home_address_id, 'vendor' → Local_Vendors.business_address_id.
+    # pick address fields by role; address_owner says which fk to update on insert
     if role == 'seller':
         if vendor_row:
             # Local vendor: business address lives on Local_Vendors.
@@ -535,9 +525,7 @@ def profile():
         address_label = 'Home Address'
         address_owner = 'bidder'
 
-    # Payment Methods tab is only meaningful for users who exist in Bidders (schema 3.5:
-    # Credit_Cards.Owner_email → Bidders.email). Pure local vendors can't own a CC, so
-    # we hide the tab for them.
+    # only bidders can have cc's so hide the payment tab from pure vendors
     can_manage_cards = bidder_row is not None
 
     address_info = None

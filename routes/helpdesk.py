@@ -223,9 +223,7 @@ def _handle_change_id(db, req):
     if taken:
         return f'Email "{new_email}" is already in use.'
 
-    # Defer FK checks until COMMIT so we can rewrite Users.email and every
-    # referencing row in one atomic batch. Without this, the Users update
-    # fails immediately on any child row (Bidders, Sellers, Helpdesk, ...).
+    # defer fk checks so we can rewrite users.email + child rows atomically
     db.execute('PRAGMA defer_foreign_keys = ON')
     db.execute('UPDATE Users SET email = ? WHERE email = ?', [new_email, old_email])
 
@@ -410,9 +408,7 @@ def _build_category_tree():
     )
     children = {}
     for row in rows:
-        # Skip the seeded 'Root' sentinel row itself. Its parent is NULL, and
-        # treating NULL as 'Root' would list Root as a child of Root and send
-        # the recursive tree template into infinite recursion.
+        # skip the root row itself, otherwise the recursive template loops forever
         if row['category_name'] == 'Root':
             continue
         parent = row['parent_category'] or 'Root'

@@ -24,9 +24,7 @@ def dashboard():
     balance_num = float(bal['balance'] or 0)
 
     has_card = query_db('SELECT 1 FROM Credit_Cards WHERE Owner_email = ?', [email], one=True) is not None
-    # Seller subtype drives which payment methods the promotion dialog exposes:
-    # local vendors can't own CCs (schema 3.5) so they must use balance; student
-    # sellers (also in Bidders) may choose either.
+    # vendors can't use cc, student sellers can pick either; drives the promote dialog
     is_vendor = query_db('SELECT 1 FROM Local_Vendors WHERE email = ?', [email], one=True) is not None
     is_bidder = query_db('SELECT 1 FROM Bidders WHERE email = ?', [email], one=True) is not None
     
@@ -99,7 +97,7 @@ def dashboard():
 # Initial Step of Creating a Listing, Selecting a Category
 @seller_bp.route('/list_product', methods=['GET', 'POST'])
 def list_product():
-    # BR-18: only leaf categories hold products — exclude any category that is someone's parent.
+    # only leaf categories can hold products, filter out parents
     categories = query_db('''
         SELECT category_name FROM Categories
         WHERE category_name NOT IN (SELECT DISTINCT parent_category FROM Categories WHERE parent_category IS NOT NULL)
@@ -222,8 +220,7 @@ def edit_listing(lid): #should pass in the listing id
         flash('There has been an error, listing not found')
         return redirect(url_for('seller.dashboard'))
 
-    # BR-18: only leaf categories hold products. Include the listing's current category
-    # as an OR branch so legacy listings filed under a now-non-leaf category still render.
+    # only leaf categories; keep the listing's current one even if not a leaf
     categories = query_db('''
         SELECT category_name FROM Categories
         WHERE category_name NOT IN (SELECT DISTINCT parent_category FROM Categories WHERE parent_category IS NOT NULL)
@@ -474,7 +471,7 @@ def promote_listing(listing_id):
     is_vendor = query_db('SELECT 1 FROM Local_Vendors WHERE email = ?', [email], one=True) is not None
     is_bidder = query_db('SELECT 1 FROM Bidders WHERE email = ?', [email], one=True) is not None
 
-    # Vendors can't own CCs per schema 3.5, so force balance even if the form was tampered with.
+    # vendors can't use cc, force balance even if someone tampered with the form
     if is_vendor and not is_bidder:
         payment_method = 'balance'
     if payment_method not in ('balance', 'card'):

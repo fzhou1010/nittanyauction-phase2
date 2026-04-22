@@ -120,8 +120,7 @@ def main():
         db.executescript(f.read())
     print('Schema created.')
 
-    # BR-18: seed the Root sentinel category so child rows' parent_category FK resolves.
-    # Categories.csv references parent_category='Root' but doesn't declare the Root row itself.
+    # seed the root category so child fk's resolve
     db.execute('INSERT OR IGNORE INTO Categories (category_name, parent_category) VALUES (?, ?)', ['Root', None])
 
     # Load each CSV into its corresponding table
@@ -129,10 +128,7 @@ def main():
         count = load_csv(db, filename, table, columns)
         print(f'  {table}: {count} rows sucessfully loaded from {filename}')
 
-    # Seed the sentinel "unassigned" helpdesk account. Requests submitted by
-    # users before a staff member claims them point at this email via
-    # Requests.helpdesk_staff_email, which has a FK to Helpdesk(email). No one
-    # logs in as this account — the password is an unusable placeholder.
+    # placeholder helpdesk account for unassigned requests; nobody logs in as this
     db.execute(
         'INSERT OR IGNORE INTO Users (email, password) VALUES (?, ?)',
         [HELPDESK_TEAM_EMAIL, hash_password('!unassigned!')],

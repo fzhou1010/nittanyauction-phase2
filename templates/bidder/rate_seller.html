@@ -63,9 +63,7 @@
 </div>
 
 <style>
-/* Reverse-order + row-reverse trick gives us a pure-CSS interactive 5-star rating.
-   DOM order is 5,4,3,2,1 so `:checked ~ label` and `:hover ~ label` select the
-   labels to the visual LEFT of the current one. */
+/* reverse order + row-reverse so :checked ~ label fills stars to the left */
 .star-rating {
     display: inline-flex;
     flex-direction: row-reverse;

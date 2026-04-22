@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session
 from db import get_db, query_db
 
-# Shared notifications blueprint — used by bidders, sellers, and helpdesk staff.
+# notifications blueprint, shared across all roles
 # Registered with url_prefix='/notifications' in app.py.
 notifications_bp = Blueprint('notifications', __name__)
 

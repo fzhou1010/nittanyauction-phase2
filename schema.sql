@@ -86,8 +86,7 @@ CREATE TABLE IF NOT EXISTS Categories (
     category_name TEXT,
     parent_category TEXT,
     PRIMARY KEY (category_name),
-    -- ON UPDATE CASCADE: helpdesk-driven category rename propagates to children.
-    -- ON DELETE defaults to NO ACTION so deleting a parent with children fails loudly instead of orphaning them.
+    -- cascade renames to children; deleting a parent with children should fail
     FOREIGN KEY (parent_category) REFERENCES Categories(category_name) ON UPDATE CASCADE
 );
 -- add condition - DONE
@@ -112,8 +111,7 @@ CREATE TABLE IF NOT EXISTS Auction_Listings (
     Status INTEGER DEFAULT 1 CHECK(Status IN (0,1,2,3)),
     PRIMARY KEY (Seller_Email, Listing_ID),
     FOREIGN KEY (Seller_Email) REFERENCES Sellers(email),
-    -- ON UPDATE CASCADE keeps listings consistent with helpdesk-driven category renames.
-    -- ON DELETE RESTRICT prevents category deletion from silently wiping auction history (BR-9).
+    -- keep listings in sync with category renames; don't let deletes wipe history
     FOREIGN KEY (Category) REFERENCES Categories(category_name) ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
@@ -152,8 +150,7 @@ CREATE TABLE IF NOT EXISTS Rating (
     FOREIGN KEY (Seller_Email, Listing_ID) REFERENCES Auction_Listings(Seller_Email, Listing_ID)
 );
 
--- BR-15: at most one rating per (bidder, seller, completed auction).
--- Partial index so seed rows with NULL Listing_ID are exempt.
+-- one rating per auction; partial so legacy rows with null listing_id are fine
 CREATE UNIQUE INDEX IF NOT EXISTS idx_rating_unique_per_listing
     ON Rating(Bidder_Email, Seller_Email, Listing_ID)
     WHERE Listing_ID IS NOT NULL;
@@ -208,9 +205,7 @@ SELECT Seller_Email,
 FROM Rating
 GROUP BY Seller_Email;
 
--- Per-listing bid aggregate (current highest bid + total bid count).
--- Replaces the correlated MAX/COUNT subqueries that recurred across the dashboard,
--- cart, and browse paths, and collapses the seller-dashboard N+1 into a LEFT JOIN.
+-- per-listing bid stats so we just join instead of running subqueries everywhere
 CREATE VIEW IF NOT EXISTS Listing_Bid_Stats AS
 SELECT Seller_Email,
        Listing_ID,
@@ -219,10 +214,7 @@ SELECT Seller_Email,
 FROM Bids
 GROUP BY Seller_Email, Listing_ID;
 
--- Indexes on hot query paths identified in audit:
--- Notifications is queried by (recipient, is_read) on every page load via the
--- app-level context processor; the other four back the frequent filter/join
--- patterns in browse, seller dashboard, cart, and Seller_Avg_Rating.
+-- indexes for the hot queries (notifications, browse, dashboard, cart, ratings)
 CREATE INDEX IF NOT EXISTS idx_notifications_recipient_unread ON Notifications(recipient_email, is_read);
 CREATE INDEX IF NOT EXISTS idx_bids_listing ON Bids(Seller_Email, Listing_ID);
 CREATE INDEX IF NOT EXISTS idx_listings_status_category ON Auction_Listings(Status, Category);

@@ -111,9 +111,7 @@ def cart_remove():
 def auction_history():
     email = session['email']
 
-    # Won auctions: closed listings where this bidder had the highest bid and it met reserve.
-    # `already_rated` lets the template show "Rate Seller" only when BR-14 (paid) is met
-    # AND BR-15 (no prior rating for this completed auction) hasn't already been recorded.
+    # won auctions + whether they already rated the seller
     won_rows = query_db(
         '''
         SELECT
@@ -189,8 +187,7 @@ def auction_history():
 def rate_seller(seller_email, listing_id):
     email = session['email']
 
-    # Role gate: only registered bidders can rate. Without this, a helpdesk-only
-    # account could POST and trip the Bidders FK from the wrong layer.
+    # only bidders can rate
     if not query_db('SELECT 1 FROM Bidders WHERE email = ?', [email], one=True):
         flash('Only bidders can rate sellers.', 'danger')
         return redirect(url_for('listings.browse'))
@@ -204,7 +201,7 @@ def rate_seller(seller_email, listing_id):
         flash('Listing not found.', 'danger')
         return redirect(url_for('bidder.auction_history'))
 
-    # BR-14: rating requires a completed, paid transaction by this bidder.
+    # need to have actually won + paid for this auction
     transaction = query_db(
         'SELECT 1 FROM Transactions '
         'WHERE Seller_Email = ? AND Listing_ID = ? AND Bidder_Email = ?',
@@ -214,8 +211,7 @@ def rate_seller(seller_email, listing_id):
         flash('You can only rate a seller after winning and paying for one of their auctions.', 'warning')
         return redirect(url_for('bidder.auction_history'))
 
-    # BR-15: at most one rating per completed auction. Schema also enforces this
-    # via a partial unique index, but the early check gives a clean message.
+    # one rating per auction; schema enforces it too but this gives a nicer msg
     existing_rating = query_db(
         'SELECT Rating, Rating_Desc, Date FROM Rating '
         'WHERE Bidder_Email = ? AND Seller_Email = ? AND Listing_ID = ?',
@@ -263,8 +259,7 @@ def rate_seller(seller_email, listing_id):
 def apply_seller():
     email = session['email']
 
-    # Defensive: this route is for bidders upgrading to sellers. A non-bidder
-    # landing here is most likely a session/role mismatch, not a valid path.
+    # only bidders can apply; anyone else here is a session mixup
     if not query_db('SELECT 1 FROM Bidders WHERE email = ?', [email], one=True):
         flash('Only bidders may apply to become sellers.')
         return redirect(url_for('listings.browse'))
@@ -301,9 +296,7 @@ def apply_seller():
                 form={'bank_routing_num': routing, 'bank_account_num': account, 'note': note},
             )
 
-        # request_desc encodes the application payload as JSON so values can
-        # contain '|' or ':' without being mangled. The helpdesk parser also
-        # accepts the legacy pipe format, keeping CSV-seeded rows readable.
+        # json payload so special chars don't break parsing
         desc = format_request_desc(ROUTING=routing, ACCOUNT=account, NOTE=note)
 
         db = get_db()

@@ -126,17 +126,11 @@ def browse():
 
 
 
-    # Flat search bypasses the hierarchy entirely. Entering search mode when the
-    # user submits only a price filter (with no keyword) makes the price filter
-    # actually do something — otherwise the form submit bounced back to hierarchy
-    # mode and silently discarded the filter.
+    # price filter alone should trigger search mode too
     has_price_filter = price_min is not None or price_max is not None
     if search or has_price_filter:
         like = f'%{search}%' if search else '%'
-        # Price-range filter: COALESCE Current_Bid to 0 so listings that have received
-        # no bids yet (Current_Bid IS NULL) aren't silently dropped when the user sets
-        # a max. Without this, `NULL <= max` evaluates to NULL (falsy) and the ~95% of
-        # active listings that have no bids disappear the moment any filter is applied.
+        # coalesce null current_bid to 0 so no-bid listings don't get dropped
         category_clause = ''
         category_params = []
         if category:
@@ -327,8 +321,7 @@ def detail(seller_email, listing_id):
     bid_count = len(bids)
     remaining_bids = listing['Max_bids'] - bid_count if listing['Max_bids'] else 0
 
-    # Reserve price is a seller's sale threshold, not a bid floor — bidders
-    # can open at any positive amount and just need to outbid the current highest.
+    # first bid can be anything positive; later bids must beat the current highest
     if bids:
         min_bid = int(bids[0]['Bid_Price']) + 1
     else:
@@ -351,9 +344,7 @@ def detail(seller_email, listing_id):
         "SELECT * FROM Rating WHERE Seller_Email = ?",
         [seller_email]
     )
-    # Rating.Date is stored as TEXT in mixed formats (seed uses 'M/D/YY', our
-    # code writes ISO 'YYYY-MM-DD'), so ORDER BY Date sorts lexicographically
-    # and produces garbage. Parse in Python and sort newest-first for display.
+    # dates mix 'M/D/YY' seed with iso writes, so sort in python not sql
     from datetime import datetime
     def _parse_rating_date(s):
         if not s:
@@ -396,7 +387,7 @@ def place_bid(seller_email, listing_id):
     
     user_email = session.get('email')
 
-    # BR-3: a seller cannot bid on their own listing.
+    # can't bid on your own listing
     if user_email == seller_email:
         flash('You cannot bid on your own listing.', 'danger')
         return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
@@ -415,9 +406,7 @@ def place_bid(seller_email, listing_id):
         WHERE Seller_Email = ? AND Listing_ID = ?
     ''', [seller_email, listing_id], one=True)
 
-    # If the auction is closed, reject the bid. Status 0 = seller-removed,
-    # 3 = failed (reserve not met). Both are closed to new bids. Status 2
-    # (sold) is already handled by the Max_bids / completion path.
+    # skip closed auctions
     if auction['Status'] in (0, 3):
         flash('This listing is closed and cannot accept new bids.', 'danger')
         return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
@@ -437,9 +426,7 @@ def place_bid(seller_email, listing_id):
         flash('You cannot place consecutive bids — wait for another bidder first.', 'danger')
         return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
 
-    # Reserve price is the seller's sale threshold (checked at auction close), not
-    # a bid floor. Any positive bid is allowed for the first bid; subsequent bids
-    # must exceed the current highest by at least $1.
+    # first bid just needs to be positive, later ones must beat the highest by $1
     if current_bids['highest_bid'] is None:
         min_required = 1.00
     else:
@@ -457,7 +444,7 @@ def place_bid(seller_email, listing_id):
     ''', (seller_email, listing_id, user_email, bid_amount))
     db.commit()
 
-    # Auction may have just reached Max_bids — resolve to Sold (reserve met) or Failed.
+    # see if this bid ended the auction
     outcome = check_auction_complete(seller_email, listing_id)
     if outcome and outcome['status'] == 'sold':
         if outcome['winner'] == user_email:
@@ -586,9 +573,7 @@ def pay(seller_email, listing_id):
     )
     db.commit()
 
-    # Nudge the buyer to leave a rating. Rating stays available in auction history
-    # for as long as they want — this notification exists so they discover it.
-    # notify() doesn't commit, so we follow it with an explicit commit.
+    # ping them to rate the seller from their auction history
     title = listing['Auction_Title'] or listing['Product_Name'] or 'your purchase'
     notify(
         email, 'rating_available',
