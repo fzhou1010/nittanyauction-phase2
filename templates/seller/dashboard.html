@@ -64,7 +64,7 @@
                         <th>Product</th>
                         <th>Category</th>
                         <th class="text-center">Bids</th>
-                        <th class="text-end">Highest Bid</th>
+                        <th class="text-end text-nowrap">Highest Bid</th>
                         <th class="text-end">Reserve</th>
                         <th class="text-center">Promoted</th>
                         <th></th>
@@ -74,18 +74,22 @@
                     {% for listing in active_listings %}
                     <tr>
                         <td><span class="badge bg-primary">Active</span></td>
-                        <td>{{ listing['Auction_Title'] }}</td>
+                        <td>
+                            <a href="{{ url_for('listings.detail', seller_email=session['email'], listing_id=listing['Listing_ID']) }}" class="text-decoration-none hover-underline text-body">
+                                {{ listing['Auction_Title'] }}
+                            </a>
+                        </td>
                         <td>{{ listing['Product_Name'] }}</td>
                         <td>{{ listing['Category'] }}</td>
-                        <td class="text-center">{{ listing['bid_count'] }} / {{ listing['Max_bids'] }}</td>
-                        <td class="text-end">
+                        <td class="text-center text-nowrap">{{ listing['bid_count'] }} / {{ listing['Max_bids'] }}</td>
+                        <td class="text-end text-nowrap">
                             {% if listing['highest_bid'] %}
                                 ${{ "%.2f"|format(listing['highest_bid']) }}
                             {% else %}
                                 <span class="text-muted">No bids</span>
                             {% endif %}
                         </td>
-                        <td class="text-end">${{ "%.2f"|format(listing['Reserve_Price']) }}</td>
+                        <td class="text-end text-nowrap">${{ "%.2f"|format(listing['Reserve_Price']) }}</td>
                         <td class="text-center">
                             {% if listing['is_promoted'] %}
                                 <span class="badge bg-warning text-dark">
@@ -93,16 +97,14 @@
                                 </span>
                             {% else %}
                                 <form action="{{ url_for('seller.promote_listing', listing_id=listing['Listing_ID']) }}" method="POST" class="d-inline">
-                                    <button type="submit" class="btn btn-sm btn-outline-warning"
+                                    <button type="submit" class="btn btn-sm btn-outline-warning text-nowrap"
                                         onclick="return confirm('Promote this listing? A fee of 5% of the reserve price (${{ '%.2f'|format(listing['Reserve_Price'] * 0.05) }}) will be charged.')">
                                         <i class="bi bi-megaphone me-1"></i>Promote
                                     </button>
                                 </form>
                             {% endif %}
                         </td>
-                        <td>
-                            <a href="{{ url_for('listings.detail', seller_email=session['email'], listing_id=listing['Listing_ID']) }}"
-                                class="btn btn-sm btn-outline-primary">View</a>
+                        <td class="text-nowrap">
                             <a href="{{ url_for('seller.edit_listing', lid=listing['Listing_ID']) }}"
                                 class="btn btn-sm btn-outline-secondary">Edit</a>
                         </td>
@@ -137,14 +139,17 @@
                         <th>Buyer Email</th>
                         <th>Payment</th>
                         <th>Date</th>
-                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for listing in sold_listings %}
                     <tr>
                         <td><span class="badge text-danger">Sold</span></td>
-                        <td>{{ listing['Auction_Title'] }}</td>
+                        <td>
+                            <a href="{{ url_for('listings.detail', seller_email=session['email'], listing_id=listing['Listing_ID']) }}" class="text-decoration-none hover-underline text-body">
+                                {{ listing['Auction_Title'] }}
+                            </a>
+                        </td>
                         <td>{{ listing['Product_Name'] }}</td>
                         <td>{{ listing['Category'] }}</td>
                         {% if listing['Buyer_Email']%}
@@ -156,14 +161,10 @@
                                 Transaction Pending
                             </td>
                         {%endif%}
-                        <td>
-                            <a href="{{ url_for('listings.detail', seller_email=session['email'], listing_id=listing['Listing_ID']) }}"
-                                class="btn btn-sm btn-outline-primary">View</a>
-                        </td>
                     </tr>
                     {%else%}
                     <tr>
-                        <td colspan="8" class="col-md-6 text-center text-muted p-3">There are no sold listings currently</td>
+                        <td colspan="7" class="col-md-6 text-center text-muted p-3">There are no sold listings currently</td>
                     </tr>
                     {% endfor %}
                 </tbody>

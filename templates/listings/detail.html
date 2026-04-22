@@ -41,6 +41,10 @@
                             </button>
                         </form>
                         {% endif %}
+                    {% elif listing.Status == 1 %}
+                        <a href="{{ url_for('seller.edit_listing', lid=listing.Listing_ID) }}" class="btn btn-outline-secondary btn-sm flex-shrink-0">
+                            <i class="bi bi-pencil me-1"></i>Edit Listing
+                        </a>
                     {% endif %}
                 </div>
                 <p class="text-muted">
@@ -97,11 +101,11 @@
                 {% else %}
                     {# ── Active auction ── #}
                     {% set is_top_bidder = bids and bids[0].Bidder_Email == session.get('email') %}
-                    <h2 class="h4 mb-3 text-center">Current Highest Bid</h2>
+                    <h2 class="h4 text-center mb-0">Current Highest Bid</h2>
                     {% if bids %}
-                    <p class="h4 text-center mb-1 {% if is_top_bidder %}text-success{% endif %}">${{ bids[0].Bid_Price }}</p>
+                    <p class="h4 text-center my-3 {% if is_top_bidder %}text-success{% endif %}">${{ bids[0].Bid_Price }}</p>
                     {% else %}
-                    <p class="h4 text-center mb-1">No bids yet</p>
+                    <p class="text-muted text-center my-3">No bids yet</p>
                     {% endif %}
                     {% if is_top_bidder %}
                     <p class="text-center small mb-1">
@@ -121,7 +125,7 @@
                         <button type="submit" class="btn btn-primary w-100">Place Bid</button>
                     </form>
                     {% else %}
-                    <p class="text-muted fst-italic">You cannot bid on your own listing.</p>
+                    <p class="text-muted fst-italic text-center mb-0">You cannot bid on your own listing.</p>
                     {% endif %}
                 {% endif %}
             </div>
