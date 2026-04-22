@@ -487,30 +487,58 @@ def profile():
     role = session.get('role')
     db = get_db()
 
-    # Always try Bidders first for name info since student sellers are in both tables
-    user_info = query_db('''
-        SELECT first_name, last_name, age, major, home_address_id 
+    # Bidders row drives both the name display (when applicable) and the home-address FK
+    # for student sellers; we always fetch it up front so both the seller and bidder paths
+    # can reuse it.
+    bidder_row = query_db('''
+        SELECT first_name, last_name, age, major, home_address_id
         FROM Bidders WHERE email = ?''', [user_email], one=True)
+    vendor_row = query_db(
+        'SELECT business_address_id FROM Local_Vendors WHERE email = ?',
+        [user_email], one=True)
 
-    # Get address_id based on role
+    # Resolve (user_info, address_id, address_label, address_owner) per role.
+    # address_owner tells the POST branch which FK to update when we create a
+    # brand-new Address row: 'bidder' → Bidders.home_address_id, 'vendor' → Local_Vendors.business_address_id.
     if role == 'seller':
-        vendor_info = query_db('SELECT business_address_id FROM Local_Vendors WHERE email = ?', [user_email], one=True)
-        address_id = vendor_info['business_address_id'] if vendor_info else None
-        # fall back to bidder address if they're also a bidder
-        if not address_id and user_info:
-            address_id = user_info['home_address_id']
+        if vendor_row:
+            # Local vendor: business address lives on Local_Vendors.
+            user_info = bidder_row  # may be None; template guards with "if user"
+            address_id = vendor_row['business_address_id']
+            address_label = 'Business Address'
+            address_owner = 'vendor'
+        else:
+            # Student seller: address lives on Bidders (student sellers are also bidders).
+            user_info = bidder_row
+            address_id = bidder_row['home_address_id'] if bidder_row else None
+            address_label = 'Home Address'
+            address_owner = 'bidder'
     elif role == 'helpdesk':
         user_info = query_db('SELECT email, position FROM Helpdesk WHERE email = ?', [user_email], one=True)
-        # helpdesk may also be a bidder or seller, try to get their address from those tables
-        bidder_info = query_db('SELECT first_name, last_name, home_address_id FROM Bidders WHERE email = ?', [user_email], one=True)
-        if bidder_info:
-            user_info = bidder_info  # use bidder info for name display too
-            address_id = bidder_info['home_address_id']
+        # Helpdesk staff may also hold a bidder/vendor identity; surface whichever address exists.
+        if bidder_row:
+            user_info = bidder_row
+            address_id = bidder_row['home_address_id']
+            address_label = 'Home Address'
+            address_owner = 'bidder'
+        elif vendor_row:
+            address_id = vendor_row['business_address_id']
+            address_label = 'Business Address'
+            address_owner = 'vendor'
         else:
-            seller_info = query_db('SELECT home_address_id FROM Sellers WHERE email = ?', [user_email], one=True)
-            address_id = seller_info['home_address_id'] if seller_info else None
+            address_id = None
+            address_label = 'Mailing Address'
+            address_owner = None
     else:  # bidder
-        address_id = user_info['home_address_id'] if user_info else None
+        user_info = bidder_row
+        address_id = bidder_row['home_address_id'] if bidder_row else None
+        address_label = 'Home Address'
+        address_owner = 'bidder'
+
+    # Payment Methods tab is only meaningful for users who exist in Bidders (schema 3.5:
+    # Credit_Cards.Owner_email → Bidders.email). Pure local vendors can't own a CC, so
+    # we hide the tab for them.
+    can_manage_cards = bidder_row is not None
 
     address_info = None
     if address_id:
@@ -540,18 +568,20 @@ def profile():
                 db.execute('''UPDATE Address SET street_num = ?, street_name = ?, zipcode = ?
                             WHERE address_id = ?''',
                             [street_num, street_name, zipcode, address_id])
-            else:
+            elif address_owner:
                 new_address_id = uuid.uuid4().hex
                 db.execute('INSERT INTO Address (address_id, zipcode, street_num, street_name) VALUES (?, ?, ?, ?)',
                         [new_address_id, zipcode, street_num, street_name])
-                if user_info:  # bidder or student seller
-                    db.execute('UPDATE Bidders SET home_address_id = ? WHERE email = ?', 
+                if address_owner == 'bidder':
+                    db.execute('UPDATE Bidders SET home_address_id = ? WHERE email = ?',
                             [new_address_id, user_email])
-                elif role == 'seller':
-                    is_vendor = query_db('SELECT 1 FROM Local_Vendors WHERE email = ?', [user_email], one=True)
-                    if is_vendor:
-                        db.execute('UPDATE Local_Vendors SET business_address_id = ? WHERE email = ?', 
-                                [new_address_id, user_email])
+                elif address_owner == 'vendor':
+                    db.execute('UPDATE Local_Vendors SET business_address_id = ? WHERE email = ?',
+                            [new_address_id, user_email])
+            else:
+                db.commit()
+                flash('No address record exists for this account.', 'danger')
+                return redirect(url_for('auth.profile'))
             db.commit()
             flash('Address updated successfully!', 'success')
 
@@ -569,6 +599,9 @@ def profile():
                 flash('Incorrect current password.', 'danger')
 
         elif form_type == 'add_card':
+            if not can_manage_cards:
+                flash('Credit cards can only be added to bidder accounts.', 'danger')
+                return redirect(url_for('auth.profile'))
             credit_card_num = (request.form.get('credit_card_num') or '').strip()
             card_type = (request.form.get('card_type') or '').strip()
             expire_month = request.form.get('expire_month')
@@ -607,7 +640,14 @@ def profile():
 
         return redirect(url_for('auth.profile'))
 
-    return render_template('auth/profile.html', user=user_info, address=address_info, cards=cards)
+    return render_template(
+        'auth/profile.html',
+        user=user_info,
+        address=address_info,
+        address_label=address_label,
+        cards=cards,
+        can_manage_cards=can_manage_cards,
+    )
 
 
 @auth_bp.route('/profile/changeID', methods=['POST'])

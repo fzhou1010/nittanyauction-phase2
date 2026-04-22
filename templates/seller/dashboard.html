@@ -101,19 +101,72 @@
                                 <span class="badge bg-warning text-dark">
                                     <i></i>Featured
                                 </span>
-                            {% elif not has_card %}
-                                <a href="{{ url_for('auth.profile') }}?tab=payment" class="btn btn-sm btn-outline-secondary text-nowrap"
-                                    onclick="return confirm('You need a credit card on file to promote a listing. Go to your profile to add one.')">
-                                    <i class="bi bi-megaphone me-1"></i>Promote
-                                </a>
                             {% else %}
-                                {% set fee = "%.2f"|format(listing['Reserve_Price'] * 0.05) %}
-                                <form action="{{ url_for('seller.promote_listing', listing_id=listing['Listing_ID']) }}" method="POST">
-                                    <button type="submit" class="btn btn-sm btn-outline-warning text-nowrap"
-                                        onclick="return confirm('Promote this listing? A fee of ${{ fee }} will be charged.')">
-                                        <i class="bi bi-megaphone me-1"></i>Promote
-                                    </button>
-                                </form>
+                                {% set fee_num = listing['Reserve_Price'] * 0.05 %}
+                                {% set fee = "%.2f"|format(fee_num) %}
+                                <button type="button" class="btn btn-sm btn-outline-warning text-nowrap"
+                                    data-bs-toggle="modal" data-bs-target="#promoteModal{{ listing['Listing_ID'] }}">
+                                    <i class="bi bi-megaphone me-1"></i>Promote
+                                </button>
+                                <div class="modal fade" id="promoteModal{{ listing['Listing_ID'] }}" tabindex="-1" aria-hidden="true">
+                                  <div class="modal-dialog">
+                                    <div class="modal-content">
+                                      <form action="{{ url_for('seller.promote_listing', listing_id=listing['Listing_ID']) }}" method="POST">
+                                        <div class="modal-header">
+                                          <h5 class="modal-title">Promote "{{ listing['Auction_Title'] }}"</h5>
+                                          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body text-start">
+                                          <p class="mb-2">Promotion fee: <strong>${{ fee }}</strong> (5% of reserve price).</p>
+                                          <p class="text-muted small mb-3">Current balance: ${{ "%.2f"|format(balance_num) }}</p>
+                                          {% set balance_ok = balance_num >= fee_num %}
+                                          {% if is_bidder %}
+                                            <p class="small mb-2">Choose payment method:</p>
+                                            <div class="form-check">
+                                              <input class="form-check-input" type="radio" name="payment_method" value="card"
+                                                id="pm_card_{{ listing['Listing_ID'] }}"
+                                                {% if has_card %}checked{% else %}disabled{% endif %}>
+                                              <label class="form-check-label" for="pm_card_{{ listing['Listing_ID'] }}">
+                                                Credit card{% if not has_card %} <span class="text-muted small">(none on file — add one in your profile)</span>{% endif %}
+                                              </label>
+                                            </div>
+                                            <div class="form-check">
+                                              <input class="form-check-input" type="radio" name="payment_method" value="balance"
+                                                id="pm_bal_{{ listing['Listing_ID'] }}"
+                                                {% if not has_card %}checked{% endif %}
+                                                {% if not balance_ok %}disabled{% endif %}>
+                                              <label class="form-check-label" for="pm_bal_{{ listing['Listing_ID'] }}">
+                                                Balance{% if not balance_ok %} <span class="text-danger small">(insufficient funds)</span>{% endif %}
+                                              </label>
+                                            </div>
+                                          {% else %}
+                                            <input type="hidden" name="payment_method" value="balance">
+                                            {% if balance_ok %}
+                                              <p class="small mb-0">The fee will be deducted from your seller balance.</p>
+                                            {% else %}
+                                              <p class="text-danger small mb-0">
+                                                Your balance is insufficient to promote this listing. Earn sale proceeds and try again.
+                                              </p>
+                                            {% endif %}
+                                          {% endif %}
+                                        </div>
+                                        <div class="modal-footer">
+                                          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                          {% if is_bidder %}
+                                            <button type="submit" class="btn btn-warning"
+                                              {% if not has_card and not balance_ok %}disabled{% endif %}>
+                                              Confirm Promotion
+                                            </button>
+                                          {% else %}
+                                            <button type="submit" class="btn btn-warning" {% if not balance_ok %}disabled{% endif %}>
+                                              Confirm Promotion
+                                            </button>
+                                          {% endif %}
+                                        </div>
+                                      </form>
+                                    </div>
+                                  </div>
+                                </div>
                             {% endif %}
                         </td>
                         <!-- if the listing has bids, editing should be grayed out / locked -->

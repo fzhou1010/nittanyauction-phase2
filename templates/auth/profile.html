@@ -33,9 +33,11 @@
                     <a class="list-group-item list-group-item-action active" id="addr-list" data-bs-toggle="list" href="#pane-address" role="tab">
                         <i class="bi bi-house-door me-2"></i>Edit Address
                     </a>
+                    {% if can_manage_cards %}
                     <a class="list-group-item list-group-item-action" id="pay-list" data-bs-toggle="list" href="#pane-payment" role="tab">
                         <i class="bi bi-credit-card me-2"></i>Payment Methods
                     </a>
+                    {% endif %}
                     <a class="list-group-item list-group-item-action" id="pass-list" data-bs-toggle="list" href="#pane-password" role="tab">
                         <i class="bi bi-shield-lock me-2"></i>Security
                     </a>
@@ -59,7 +61,7 @@
                 
                 <div class="tab-pane fade show active" id="pane-address" role="tabpanel">
                     <div class="card shadow-sm p-4 mb-4">
-                        <h3 class="mb-4">Mailing Address</h3>
+                        <h3 class="mb-4">{{ address_label or 'Mailing Address' }}</h3>
                         <form action="{{ url_for('auth.profile') }}" method="POST">
                             <input type="hidden" name="form_type" value="update_address">
                             
@@ -90,6 +92,7 @@
                     </div>
                 </div>
 
+                {% if can_manage_cards %}
                 <div class="tab-pane fade" id="pane-payment" role="tabpanel">
                     <div class="card shadow-sm p-4 mb-4">
                         <h3 class="mb-4">Saved Cards</h3>
@@ -138,6 +141,7 @@
                         </form>
                     </div>
                 </div>
+                {% endif %}
 
                 <div class="tab-pane fade" id="pane-password" role="tabpanel">
                     <div class="card shadow-sm p-4">
@@ -237,7 +241,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tabEl) bootstrap.Tab.getOrCreateInstance(tabEl).show();
     } else if (tab === 'payment') {
         const tabEl = document.querySelector('#pay-list');
-        if (tabEl) bootstrap.Tab.getOrCreateInstance(tabEl).show();
+        if (tabEl) {
+            bootstrap.Tab.getOrCreateInstance(tabEl).show();
+        } else {
+            const addrEl = document.querySelector('#addr-list');
+            if (addrEl) bootstrap.Tab.getOrCreateInstance(addrEl).show();
+        }
     }
 });
 </script>

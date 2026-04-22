@@ -21,8 +21,14 @@ def dashboard():
     email = session['email']
     bal = query_db('SELECT balance from Sellers WHERE email = ?', [email], one=True)
     bal = bal or {'balance': 0.00} # if bal is none, default to 0 balance
+    balance_num = float(bal['balance'] or 0)
 
     has_card = query_db('SELECT 1 FROM Credit_Cards WHERE Owner_email = ?', [email], one=True) is not None
+    # Seller subtype drives which payment methods the promotion dialog exposes:
+    # local vendors can't own CCs (schema 3.5) so they must use balance; student
+    # sellers (also in Bidders) may choose either.
+    is_vendor = query_db('SELECT 1 FROM Local_Vendors WHERE email = ?', [email], one=True) is not None
+    is_bidder = query_db('SELECT 1 FROM Bidders WHERE email = ?', [email], one=True) is not None
     
     # Active listings + per-listing bid stats in a single query via the Listing_Bid_Stats view.
     # LEFT JOIN so listings with zero bids still appear.
@@ -87,7 +93,8 @@ def dashboard():
         seller_rating = {'avg_rating': None, 'count': 0}
     
     return render_template('seller/dashboard.html', bal=bal, active_listings=active_listing_details, sold_listings=sold_listings_details,
-                           q_count=q_count, seller_rating=seller_rating, inactive_listings=inactive_listings, has_card=has_card)
+                           q_count=q_count, seller_rating=seller_rating, inactive_listings=inactive_listings,
+                           has_card=has_card, is_vendor=is_vendor, is_bidder=is_bidder, balance_num=balance_num)
 
 # Initial Step of Creating a Listing, Selecting a Category
 @seller_bp.route('/list_product', methods=['GET', 'POST'])
@@ -447,38 +454,62 @@ def request_category():
 @seller_bp.route('/promote/<int:listing_id>', methods=['POST'])
 def promote_listing(listing_id):
     email = session['email']
+    # payment_method: 'balance' (all sellers) or 'card' (student sellers / dual-role only).
+    # Local vendors are forced to 'balance' regardless of what the form sends.
+    payment_method = (request.form.get('payment_method') or '').strip().lower()
 
-    card = query_db('SELECT 1 FROM Credit_Cards WHERE Owner_email = ?', [email], one=True)
-
-    if not card:
-        flash('You must have a credit card on file to promote a listing.', 'danger')
-        return redirect(url_for('seller.dashboard'))
-    
-    listing = query_db('''SELECT * FROM Auction_Listings 
-                         WHERE Seller_Email = ? AND Listing_ID = ?''', 
+    listing = query_db('''SELECT * FROM Auction_Listings
+                         WHERE Seller_Email = ? AND Listing_ID = ?''',
                          [email, listing_id], one=True)
-    
     if not listing:
         flash('Listing not found.', 'danger')
         return redirect(url_for('seller.dashboard'))
-    
     if listing['is_promoted']:
         flash('This listing is already promoted.', 'warning')
         return redirect(url_for('seller.dashboard'))
-
     if listing['Status'] != 1:
         flash('Only active listings can be promoted.', 'danger')
         return redirect(url_for('seller.dashboard'))
 
-    promotion_fee = round(listing['Reserve_Price'] * 0.05, 2)
+    is_vendor = query_db('SELECT 1 FROM Local_Vendors WHERE email = ?', [email], one=True) is not None
+    is_bidder = query_db('SELECT 1 FROM Bidders WHERE email = ?', [email], one=True) is not None
 
+    # Vendors can't own CCs per schema 3.5, so force balance even if the form was tampered with.
+    if is_vendor and not is_bidder:
+        payment_method = 'balance'
+    if payment_method not in ('balance', 'card'):
+        flash('Please choose a payment method to promote this listing.', 'danger')
+        return redirect(url_for('seller.dashboard'))
+
+    promotion_fee = round(listing['Reserve_Price'] * 0.05, 2)
     db = get_db()
-    db.execute('''UPDATE Auction_Listings 
+
+    if payment_method == 'balance':
+        bal_row = query_db('SELECT balance FROM Sellers WHERE email = ?', [email], one=True)
+        current_balance = float(bal_row['balance'] or 0) if bal_row else 0.0
+        if current_balance < promotion_fee:
+            flash(
+                f'Insufficient balance to promote. Fee is ${promotion_fee:.2f} but your balance is ${current_balance:.2f}.',
+                'danger',
+            )
+            return redirect(url_for('seller.dashboard'))
+        db.execute('UPDATE Sellers SET balance = balance - ? WHERE email = ?',
+                   [promotion_fee, email])
+    else:  # payment_method == 'card'
+        if not is_bidder:
+            flash('Credit card payment is only available to sellers who are also bidders.', 'danger')
+            return redirect(url_for('seller.dashboard'))
+        has_card = query_db('SELECT 1 FROM Credit_Cards WHERE Owner_email = ?', [email], one=True)
+        if not has_card:
+            flash('You must have a credit card on file to pay by card. Add one in your profile.', 'danger')
+            return redirect(url_for('seller.dashboard'))
+
+    db.execute('''UPDATE Auction_Listings
                   SET is_promoted = 1, promotion_fee = ?, promotion_time = CURRENT_TIMESTAMP
                   WHERE Seller_Email = ? AND Listing_ID = ?''',
                   [promotion_fee, email, listing_id])
-
     db.commit()
 
-    flash(f'Listing promoted! A fee of ${promotion_fee} has been charged.', 'success')
+    method_label = 'balance' if payment_method == 'balance' else 'credit card'
+    flash(f'Listing promoted! A fee of ${promotion_fee:.2f} was charged to your {method_label}.', 'success')
     return redirect(url_for('seller.dashboard'))
