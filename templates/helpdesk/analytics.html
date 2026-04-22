@@ -28,7 +28,9 @@
                                 {% elif row['Status'] == 2 %}
                                 <span class="badge bg-primary">Sold</span>
                                 {% elif row['Status'] == 0 %}
-                                <span class="badge bg-secondary">Inactive</span>
+                                <span class="badge bg-secondary">Removed</span>
+                                {% elif row['Status'] == 3 %}
+                                <span class="badge bg-warning text-dark">Reserve Not Met</span>
                                 {% else %}
                                 <span class="badge bg-dark">{{ row['Status'] }}</span>
                                 {% endif %}

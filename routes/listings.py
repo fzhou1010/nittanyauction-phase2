@@ -97,8 +97,9 @@ def check_auction_complete(seller_email, listing_id):
         db.commit()
         return {'status': 'sold', 'winner': highest['Bidder_Email'], 'amount': highest['Bid_Price']}
 
+    #if the auction fails due to reserve price not being met
     db.execute(
-        'UPDATE Auction_Listings SET Status = 0 WHERE Seller_Email = ? AND Listing_ID = ?',
+        'UPDATE Auction_Listings SET Status = 3 WHERE Seller_Email = ? AND Listing_ID = ?',
         [seller_email, listing_id],
     )
     _notify_auction_close(seller_email, listing_id, title, 'failed')
@@ -414,8 +415,10 @@ def place_bid(seller_email, listing_id):
         WHERE Seller_Email = ? AND Listing_ID = ?
     ''', [seller_email, listing_id], one=True)
 
-    # if the auction is closed, reject the bid
-    if auction['Status'] == 0:
+    # If the auction is closed, reject the bid. Status 0 = seller-removed,
+    # 3 = failed (reserve not met). Both are closed to new bids. Status 2
+    # (sold) is already handled by the Max_bids / completion path.
+    if auction['Status'] in (0, 3):
         flash('This listing is closed and cannot accept new bids.', 'danger')
         return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
     
