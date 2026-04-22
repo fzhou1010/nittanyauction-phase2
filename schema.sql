@@ -107,7 +107,9 @@ CREATE TABLE IF NOT EXISTS Auction_Listings (
     is_promoted INTEGER DEFAULT 0, -- binary for whether the product is under promotion or not, default 0 for no
     promotion_fee REAL,
     promotion_time TIME,
-    Status INTEGER DEFAULT 1 CHECK(Status IN (0,1,2)),
+    -- Status enum: 1=active, 0=inactive (seller-removed), 2=sold,
+    -- 3=failed (auction closed with reserve price not met).
+    Status INTEGER DEFAULT 1 CHECK(Status IN (0,1,2,3)),
     PRIMARY KEY (Seller_Email, Listing_ID),
     FOREIGN KEY (Seller_Email) REFERENCES Sellers(email),
     -- ON UPDATE CASCADE keeps listings consistent with helpdesk-driven category renames.

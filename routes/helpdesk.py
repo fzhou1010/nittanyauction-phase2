@@ -410,6 +410,11 @@ def _build_category_tree():
     )
     children = {}
     for row in rows:
+        # Skip the seeded 'Root' sentinel row itself. Its parent is NULL, and
+        # treating NULL as 'Root' would list Root as a child of Root and send
+        # the recursive tree template into infinite recursion.
+        if row['category_name'] == 'Root':
+            continue
         parent = row['parent_category'] or 'Root'
         children.setdefault(parent, []).append(row['category_name'])
     return children
