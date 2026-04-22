@@ -242,7 +242,7 @@ def detail(seller_email, listing_id):
 
     avg_rating = query_db(
         "SELECT AVG(Rating) as Avg_Rating From Rating WHERE Seller_Email = ?",
-        [seller_email]
+        [seller_email], one=True
     )
 
     return render_template(

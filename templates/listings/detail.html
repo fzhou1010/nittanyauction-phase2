@@ -21,8 +21,21 @@
         <div class="card mb-3">
             <div class="card-body">
                 <h1>{{ listing.Auction_Title }}</h1>
-                <p class="text-muted">By {{ listing.Seller_Email }}</p>
-                <p class="text-muted">Rating: {{ avg_rating.Avg_Rating or 'No rating yet'}}</p>
+                <p class="text-muted">
+                    By {{ listing.Seller_Email }}
+                    {% if avg_rating.Avg_Rating %}
+                        {% set rounded = avg_rating.Avg_Rating|round(0, 'common')|int %}
+                        <span class="text-nowrap ms-2">
+                            {% for i in range(5) %}
+                                {% if i < rounded %}
+                                    <i class="bi bi-star-fill text-warning"></i>
+                                {% else %}
+                                    <i class="bi bi-star text-warning"></i>
+                                {% endif %}
+                            {% endfor %}
+                        </span>
+                    {% endif %}
+                </p>
                 <p>{{ listing.Product_Description or 'No description.' }}</p>
                 <p><strong>Category:</strong> {{ listing.Category }}</p>
                 <p><strong>Product:</strong> {{ listing.Product_Name }}</p>
@@ -192,7 +205,17 @@
                     <tbody>
                         {% for review in reviews %}
                         <tr>
-                            <td>{{ review.Rating }}</td>
+                            <td>
+                                <span class="text-nowrap">
+                                    {% for i in range(5) %}
+                                        {% if i < review.Rating %}
+                                            <i class="bi bi-star-fill text-warning"></i>
+                                        {% else %}
+                                            <i class="bi bi-star text-warning"></i>
+                                        {% endif %}
+                                    {% endfor %}
+                                </span>
+                            </td>
                             <td>{{ review.Bidder_Email }}</td>
                             <td>{{ review.Rating_Desc }}</td>
                             <td>{{ review.Date }}</td>
