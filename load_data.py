@@ -9,6 +9,8 @@ import os
 import sys
 import hashlib # my team and I will be using hashlib to implement SHA256 for the passwords saved in the database
 
+from db import HELPDESK_TEAM_EMAIL
+
 # Path to the database file and Schema
 DB_PATH = os.path.join(os.path.dirname(__file__), 'nittanyauction.db')
 SCHEMA_PATH = os.path.join(os.path.dirname(__file__), 'schema.sql')
@@ -23,7 +25,7 @@ LOAD_ORDER = [
     ('Helpdesk.csv', 'Helpdesk', ['email', 'position']),
     ('Zipcode_Info.csv', 'Zipcode_Info', ['zipcode', 'city', 'state']),
     ('Address.csv', 'Address', ['address_id', 'zipcode', 'street_num', 'street_name']),
-    ('Bidders.csv', 'Bidders', ['email', 'first_name', 'last_name', 'age', 'home_address_id', 'major']),
+    ('Bidders.csv', 'Bidders', ['email', 'first_name', 'last_name', 'age', 'home_address_id', 'major', 'phone']),
     ('Credit_Cards.csv', 'Credit_Cards', ['credit_card_num', 'card_type', 'expire_month', 'expire_year', 'security_code', 'Owner_email']),
     ('Sellers.csv', 'Sellers', ['email', 'bank_routing_number', 'bank_account_number', 'balance']),
     ('Local_Vendors.csv', 'Local_Vendors', ['email', 'business_name', 'business_address_id', 'customer_service_phone_number']),
@@ -122,6 +124,21 @@ def main():
     for filename, table, columns in LOAD_ORDER:
         count = load_csv(db, filename, table, columns)
         print(f'  {table}: {count} rows sucessfully loaded from {filename}')
+
+    # Seed the sentinel "unassigned" helpdesk account. Requests submitted by
+    # users before a staff member claims them point at this email via
+    # Requests.helpdesk_staff_email, which has a FK to Helpdesk(email). No one
+    # logs in as this account — the password is an unusable placeholder.
+    db.execute(
+        'INSERT OR IGNORE INTO Users (email, password) VALUES (?, ?)',
+        [HELPDESK_TEAM_EMAIL, '!unassigned!'],
+    )
+    db.execute(
+        'INSERT OR IGNORE INTO Helpdesk (email, position) VALUES (?, ?)',
+        [HELPDESK_TEAM_EMAIL, 'Unassigned Queue'],
+    )
+    db.commit()
+    print(f'  Seeded sentinel helpdesk account: {HELPDESK_TEAM_EMAIL}')
 
     db.execute('PRAGMA foreign_keys = ON')  # Reenable FK enforcement for normal use
     db.close()

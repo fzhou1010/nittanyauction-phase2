@@ -4,6 +4,14 @@ from notifications import notify
 
 listings_bp = Blueprint('listings', __name__)
 
+def get_all_subcategories(category):
+    #Recursively get all subcategories of a given category
+    subcats = [category]
+    children = query_db('SELECT category_name FROM Categories WHERE parent_category = ?', [category])
+    for child in children:
+        subcats.extend(get_all_subcategories(child['category_name']))
+    return subcats
+
 
 def _notify_auction_close(seller_email, listing_id, title, outcome, winner=None, amount=None):
     """Notify every bidder and cart-holder of the auction outcome."""
@@ -112,10 +120,16 @@ def browse():
                  WHERE b.Seller_Email = Auction_Listings.Seller_Email
                    AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
             FROM Auction_Listings
+            JOIN Bidders bd ON Auction_Listings.Seller_Email = bd.email
             WHERE Status = 1
-              AND (Auction_Title LIKE ? OR Product_Name LIKE ?)
+              AND (Auction_Listings.Auction_Title LIKE ? 
+                    OR Auction_Listings.Product_Name LIKE ? 
+                    OR Auction_Listings.Product_Description LIKE ? 
+                    OR Auction_Listings.Category LIKE ? 
+                    OR bd.first_name LIKE ? 
+                    OR bd.last_name LIKE ?)
             ''',
-            [f'%{search}%', f'%{search}%'],
+            [f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%'],
         )
         return render_template(
             'listings/browse.html',
@@ -154,6 +168,30 @@ def browse():
         )
         cur = parent['parent_category'] if parent and parent['parent_category'] != ROOT_PARENT else None
 
+    if not category:
+        promoted_listings = query_db('''
+            SELECT *,
+                (SELECT MAX(Bid_Price) FROM Bids b
+                WHERE b.Seller_Email = Auction_Listings.Seller_Email
+                AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
+            FROM Auction_Listings 
+            WHERE is_promoted = 1 AND Status = 1
+            ORDER BY promotion_time DESC
+        ''')
+    else:
+        all_cats = get_all_subcategories(category)
+        placeholders = ','.join('?' * len(all_cats))
+        promoted_listings = query_db(f'''
+            SELECT *,
+                (SELECT MAX(Bid_Price) FROM Bids b
+                WHERE b.Seller_Email = Auction_Listings.Seller_Email
+                AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
+            FROM Auction_Listings 
+            WHERE is_promoted = 1 AND Status = 1 
+            AND Category IN ({placeholders})
+            ORDER BY promotion_time DESC
+        ''', all_cats)
+
     return render_template(
         'listings/browse.html',
         mode='hierarchy',
@@ -161,6 +199,7 @@ def browse():
         listings=listings,
         category_path=path,
         current_category=category,
+        promoted_listings=promoted_listings
     )
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>')
@@ -222,11 +261,21 @@ def detail(seller_email, listing_id):
         [session['email'], seller_email, listing_id], one=True,
     ) is not None
 
+    reviews = query_db(
+        "SELECT * FROM Rating WHERE Seller_Email = ?",
+        [seller_email]
+    )
+
+    avg_rating = query_db(
+        "SELECT AVG(Rating) as Avg_Rating From Rating WHERE Seller_Email = ?",
+        [seller_email]
+    )
+
     return render_template(
         'listings/detail.html',
-        listing=listing, bids=bids, category_path=category_path,
+        listing=listing, bids=bids, avg_rating = avg_rating, category_path=category_path,
         questions=questions, winner_email=winner_email, has_paid=has_paid,
-        remaining_bids=remaining_bids, in_cart=in_cart,
+        remaining_bids=remaining_bids, in_cart=in_cart, reviews = reviews
     )
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>/bid', methods=['POST'])
@@ -242,6 +291,11 @@ def place_bid(seller_email, listing_id):
         return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
     
     user_email = session.get('email')
+
+    # BR-3: a seller cannot bid on their own listing.
+    if user_email == seller_email:
+        flash('You cannot bid on your own listing.', 'danger')
+        return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
 
     # Fetch auction details and current bids to validate the new bid
     auction = query_db('''

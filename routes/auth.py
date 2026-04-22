@@ -35,22 +35,49 @@ def login():
         user = query_db('SELECT * FROM Users WHERE email = ? AND password = ?',
                         [email, hashed], one=True)
 
-        if user:
-            # Store user info in the session so other pages know who is logged in
-            session['email'] = email
-            roles = get_user_roles(email)
-            session['roles'] = roles
+        if not user:
+            flash('Invalid email or password.')
+            return render_template('auth/login.html')
 
-            # Redirect to the appropriate welcome page based on the user's role
-            if 'helpdesk' in roles:
-                return redirect(url_for('helpdesk.welcome'))
-            elif 'seller' in roles:
+        session['email'] = email
+
+        available_roles = get_user_roles(email)
+
+        if len(available_roles) == 1:
+            role = available_roles[0]
+            session['roles'] = available_roles
+            session['role'] = role
+            session['available_roles'] = available_roles
+            if role == 'seller':
                 return redirect(url_for('seller.dashboard'))
             else:
-                return redirect(url_for('bidder.welcome'))
+                return redirect(url_for(f'{role}.welcome'))
+        else:
+            session['available_roles'] = available_roles
+            return redirect(url_for('auth.choose_role'))
 
-        flash('Invalid email or password.')
     return render_template('auth/login.html')
+
+@auth_bp.route('/choose_role')
+def choose_role():
+    if 'email' not in session:
+        return redirect(url_for('auth.login'))
+    if 'available_roles' not in session:
+        return redirect(url_for('auth.login'))
+    return render_template('auth/choose_role.html')
+
+@auth_bp.route('/set_role/<role>')
+def set_role(role):
+    if 'email' not in session:
+        return redirect(url_for('auth.login'))
+    if role in session.get('available_roles', []):
+        session['roles'] = [role]
+        session['role'] = role
+        if role == 'seller':
+            return redirect(url_for('seller.dashboard'))
+        else:
+            return redirect(url_for(f'{role}.welcome'))
+    return redirect(url_for('auth.login'))
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
@@ -95,12 +122,18 @@ def register_form(role):
             last_name = request.form['last_name']
             age = request.form.get('age') # we can use .get from the forms as these fields are not mandatory to the user signing up to use the page
             major = request.form.get('major')
+            phone = request.form['phone']
             street_num = request.form['street_num']
             street_name = request.form['street_name']
             zipcode = request.form['zipcode']
             city = request.form['city']
             state = request.form['state']
             address_id = uuid.uuid4().hex # generate a hex id for the address
+            credit_card_num = request.form['credit_card_num']
+            card_type = request.form['card_type']
+            expire_month = request.form['expire_month']
+            expire_year = request.form['expire_year']
+            security_code = request.form['security_code']
             try:
                 # the order of insert into matters, as we want don;t want an integrity error
                 db.execute('INSERT INTO Users (email, password) VALUES (?, ?)', [email, hashed_pswd])
@@ -108,11 +141,17 @@ def register_form(role):
                 db.execute('INSERT OR IGNORE INTO Zipcode_Info (zipcode, city, state) VALUES (?, ?, ?)', [zipcode, city, state])
                 db.execute('INSERT INTO Address (address_id, zipcode, street_num, street_name) VALUES (?, ?, ?, ?)',
                             [address_id, zipcode, street_num, street_name])
-                db.execute('INSERT INTO Bidders (email, first_name, last_name, age, home_address_id, major) VALUES (?, ?, ?, ?, ?, ?)', 
-                           [email, first_name, last_name, age, address_id, major])
+                db.execute('INSERT INTO Bidders (email, first_name, last_name, age, home_address_id, major, phone) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                           [email, first_name, last_name, age, address_id, major, phone])
+                # Credit_Cards FK -> Bidders(email), so this must follow the Bidders insert
+                db.execute('INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email) VALUES (?, ?, ?, ?, ?, ?)',
+                           [credit_card_num, card_type, expire_month, expire_year, security_code, email])
                 db.commit()
                 session['email'] = email
-                session['roles'] = get_user_roles(email)
+                user_roles = get_user_roles(email)
+                session['roles'] = user_roles
+                session['role'] = 'bidder'
+                session['available_roles'] = user_roles
                 return redirect(url_for('bidder.welcome'))
 
             #except Exception as e:
@@ -126,6 +165,7 @@ def register_form(role):
             last_name = request.form['last_name']
             age = request.form.get('age') # we can use .get from the forms as these fields are not mandatory to the user signing up to use the page
             major = request.form.get('major')
+            phone = request.form['phone']
             street_num = request.form['street_num']
             street_name = request.form['street_name']
             zipcode = request.form['zipcode']
@@ -134,15 +174,22 @@ def register_form(role):
             address_id = uuid.uuid4().hex # generate a hex id for the address
             bank_account_num = request.form['bank_account_num']
             bank_routing_num = request.form['bank_routing_num']
+            credit_card_num = request.form['credit_card_num']
+            card_type = request.form['card_type']
+            expire_month = request.form['expire_month']
+            expire_year = request.form['expire_year']
+            security_code = request.form['security_code']
             try:
                 # the order of insert into matters, as we want don;t want an integrity error
                 db.execute('INSERT INTO Users (email, password) VALUES (?, ?)', [email, hashed_pswd])
                 db.execute('INSERT OR IGNORE INTO Zipcode_Info (zipcode, city, state) VALUES (?, ?, ?)', [zipcode, city, state])
                 db.execute('INSERT INTO Address (address_id, zipcode, street_num, street_name) VALUES (?, ?, ?, ?)',
                             [address_id, zipcode, street_num, street_name])
-                db.execute('INSERT INTO Bidders (email, first_name, last_name, age, home_address_id, major) VALUES (?, ?, ?, ?, ?, ?)', 
-                           [email, first_name, last_name, age, address_id, major]) # since student sellers are also bidders by default, they also need to be entered into the bidders relation
-                db.execute('INSERT INTO Sellers (email, bank_routing_number, bank_account_number) VALUES (?, ?, ?)', 
+                db.execute('INSERT INTO Bidders (email, first_name, last_name, age, home_address_id, major, phone) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                           [email, first_name, last_name, age, address_id, major, phone]) # since student sellers are also bidders by default, they also need to be entered into the bidders relation
+                db.execute('INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email) VALUES (?, ?, ?, ?, ?, ?)',
+                           [credit_card_num, card_type, expire_month, expire_year, security_code, email])
+                db.execute('INSERT INTO Sellers (email, bank_routing_number, bank_account_number) VALUES (?, ?, ?)',
                            [email, bank_routing_num, bank_account_num]) #we want the balance to be set to default in the schema, therefore we don't include a value here
                 db.commit()
                 session['email'] = email
@@ -271,31 +318,73 @@ def profile():
             db.commit()
             flash('Card added successfully!', 'success')
 
+        elif form_type == 'remove_card':
+            # BR-22: scope the DELETE to the session owner so a crafted form
+            # cannot remove another bidder's card.
+            card_num = request.form.get('credit_card_num', '').strip()
+            if not card_num:
+                flash('Missing card reference.', 'danger')
+            else:
+                cur = db.execute(
+                    'DELETE FROM Credit_Cards WHERE credit_card_num = ? AND Owner_email = ?',
+                    [card_num, user_email],
+                )
+                db.commit()
+                if cur.rowcount:
+                    flash('Card removed.', 'success')
+                else:
+                    flash('Card not found.', 'danger')
+
         return redirect(url_for('auth.profile'))
 
     return render_template('auth/profile.html', user=user_info, address=address_info, cards=cards)
 
 
-@auth_bp.route('/profile/support', methods=['POST'])
-def support():
+@auth_bp.route('/profile/changeID', methods=['POST'])
+def changeID():
     if 'email' not in session:
         return redirect(url_for('auth.login'))
     
     new_email = request.form.get('new_email', '').strip()
-    request_desc = request.form.get('reason', '').strip()
     sender_email = session['email']
 
     if not new_email:
         flash('Please provide a new email address.', 'danger')
         return redirect(url_for('auth.profile'))
-
+    
     unassigned_staff = 'helpdeskteam@lsu.edu'
 
     db = get_db()
     db.execute('''
         INSERT INTO Requests (sender_email, helpdesk_staff_email, request_type, request_desc, request_status)
-        VALUES (?, ?, ?, ?, ?)''', [sender_email, unassigned_staff, 'ChangeID', f"NEW EMAIL: {new_email} | REASON: {request_desc}", 0])
+        VALUES (?, ?, ?, ?, ?)''', [sender_email, unassigned_staff, 'ChangeID', f"NEW EMAIL: {new_email}", 0])
     db.commit()
 
     flash('Your request has been submitted. A HelpDesk staff member will review your email change.', 'success')
+    return redirect(url_for('auth.profile'))
+
+@auth_bp.route('/profile/promote', methods=['POST'])
+def promote():
+    if 'email' not in session:
+        return redirect(url_for('auth.login'))
+    
+    user_email = session['email']    
+
+    account_number = request.form.get('account_number','').strip()
+    routing_number = request.form.get('routing_number','').strip()
+
+    if not account_number or not routing_number:
+        flash('Please provide both bank account number and routing number to apply for seller promotion.', 'danger')
+        return redirect(url_for('auth.profile'))
+    
+    unassigned_staff = 'helpdeskteam@lsu.edu'
+    
+    db = get_db()
+
+    db.execute('''
+        INSERT INTO Requests (sender_email, helpdesk_staff_email, request_type, request_desc, request_status)
+        VALUES (?, ?, ?, ?, ?)''', [user_email, unassigned_staff, 'BecomeSeller', f"ROUTING:{routing_number} | ACCOUNT:{account_number}" , 0])
+    db.commit()
+
+    flash('Your request has been submitted. A HelpDesk staff member will review your request.', 'success')
     return redirect(url_for('auth.profile'))

@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from db import get_db, query_db
+from db import get_db, query_db, format_request_desc, HELPDESK_TEAM_EMAIL
 
 bidder_bp = Blueprint('bidder', __name__)
 
@@ -177,38 +177,101 @@ def auction_history():
 
     return render_template('bidder/auction_history.html', won=won, bids=bid_rows)
 
-@bidder_bp.route('/notifications')
-def notifications():
-    rows = query_db(
-        'SELECT notification_id, notif_type, message, seller_email, listing_id, is_read, created_at '
-        'FROM Notifications WHERE recipient_email = ? ORDER BY created_at DESC',
-        [session['email']],
-    )
-    return render_template('bidder/notifications.html', notifications=rows)
-
-@bidder_bp.route('/notifications/mark_read', methods=['POST'])
-def notifications_mark_read():
-    notification_id = request.form.get('notification_id', '').strip()
-    db = get_db()
-    if notification_id:
-        db.execute(
-            'UPDATE Notifications SET is_read = 1 WHERE notification_id = ? AND recipient_email = ?',
-            [notification_id, session['email']],
-        )
-    else:
-        db.execute(
-            'UPDATE Notifications SET is_read = 1 WHERE recipient_email = ? AND is_read = 0',
-            [session['email']],
-        )
-    db.commit()
-    return redirect(request.form.get('next') or url_for('bidder.notifications'))
-
 @bidder_bp.route('/rate/<seller_email>', methods=['GET', 'POST'])
 def rate_seller(seller_email):
-    # TODO: rating form + insert
-    return render_template('bidder/rate_seller.html')
+    email = session["email"]
+
+    already_rated = query_db(
+        "SELECT 1 FROM Rating WHERE Bidder_Email = ? AND Seller_Email = ?", [email, seller_email], one=True
+    )
+    
+    if request.method == "POST":
+        if already_rated:
+            flash('You have already reated this seller', 'warning')
+            return redirect(url_for('bidder/rate/<seller_email>'))
+        
+        rating = request.form.get('choice', '').strip()
+        description = request.form.get('note', '').strip()
+        
+        desc = format_request_desc(RATING=rating, DESCRIPTION=description)
+
+        db = get_db()
+        db.execute(
+            'INSERT INTO Rating (Bidder_Email, Seller_Email, '
+            '                      Date, Rating, Rating_Desc) '
+            'VALUES (?, ?, ?, ?, ?)',
+            [email, seller_email, "GETDATE()", rating, description],
+        )
+        db.commit()
+        flash('Your review has been recieved. Thank you.', 'success')
+        return redirect(url_for('bidder.welcome'))
+        
+
+    return render_template('bidder/rate_seller.html',
+                           already_rated = already_rated,
+                           form={})
 
 @bidder_bp.route('/apply_seller', methods=['GET', 'POST'])
 def apply_seller():
-    # TODO: seller application form -> Requests table
-    return render_template('bidder/apply_seller.html')
+    email = session['email']
+
+    # Defensive: this route is for bidders upgrading to sellers. A non-bidder
+    # landing here is most likely a session/role mismatch, not a valid path.
+    if not query_db('SELECT 1 FROM Bidders WHERE email = ?', [email], one=True):
+        flash('Only bidders may apply to become sellers.')
+        return redirect(url_for('listings.browse'))
+
+    already_seller = query_db(
+        'SELECT 1 FROM Sellers WHERE email = ?', [email], one=True,
+    ) is not None
+
+    pending = query_db(
+        "SELECT request_id FROM Requests "
+        "WHERE sender_email = ? AND request_type = 'BecomeSeller' "
+        "  AND request_status = 0 "
+        "ORDER BY request_id DESC LIMIT 1",
+        [email], one=True,
+    )
+
+    if request.method == 'POST':
+        if already_seller:
+            flash('You are already a seller.', 'warning')
+            return redirect(url_for('bidder.apply_seller'))
+        if pending:
+            flash('You already have a pending seller application.', 'warning')
+            return redirect(url_for('bidder.apply_seller'))
+
+        routing = request.form.get('bank_routing_num', '').strip()
+        account = request.form.get('bank_account_num', '').strip()
+        note = request.form.get('note', '').strip()
+
+        if not routing or not account:
+            flash('Bank routing and account numbers are required.', 'danger')
+            return render_template(
+                'bidder/apply_seller.html',
+                already_seller=already_seller, pending=pending,
+                form={'bank_routing_num': routing, 'bank_account_num': account, 'note': note},
+            )
+
+        # request_desc encodes the application payload as JSON so values can
+        # contain '|' or ':' without being mangled. The helpdesk parser also
+        # accepts the legacy pipe format, keeping CSV-seeded rows readable.
+        desc = format_request_desc(ROUTING=routing, ACCOUNT=account, NOTE=note)
+
+        db = get_db()
+        db.execute(
+            'INSERT INTO Requests (sender_email, helpdesk_staff_email, '
+            '                      request_type, request_desc, request_status) '
+            'VALUES (?, ?, ?, ?, ?)',
+            [email, HELPDESK_TEAM_EMAIL, 'BecomeSeller', desc, 0],
+        )
+        db.commit()
+        flash('Your seller application has been submitted for review.', 'success')
+        return redirect(url_for('bidder.apply_seller'))
+
+    return render_template(
+        'bidder/apply_seller.html',
+        already_seller=already_seller,
+        pending=pending,
+        form={},
+    )

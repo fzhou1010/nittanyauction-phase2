@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS Bidders (
     age INTEGER,
     home_address_id TEXT,
     major TEXT,
+    phone TEXT,
     PRIMARY KEY (email),
     FOREIGN KEY (email) REFERENCES Users(email),
     FOREIGN KEY (home_address_id) REFERENCES Address(address_id)
@@ -82,7 +83,10 @@ CREATE TABLE IF NOT EXISTS Local_Vendors (
 CREATE TABLE IF NOT EXISTS Categories (
     category_name TEXT,
     parent_category TEXT,
-    PRIMARY KEY (category_name)
+    PRIMARY KEY (category_name),
+    -- ON UPDATE CASCADE: helpdesk-driven category rename propagates to children.
+    -- ON DELETE defaults to NO ACTION so deleting a parent with children fails loudly instead of orphaning them.
+    FOREIGN KEY (parent_category) REFERENCES Categories(category_name) ON UPDATE CASCADE
 );
 -- add condition - DONE
 CREATE TABLE IF NOT EXISTS Auction_Listings (
@@ -104,7 +108,9 @@ CREATE TABLE IF NOT EXISTS Auction_Listings (
     Status INTEGER DEFAULT 1,
     PRIMARY KEY (Seller_Email, Listing_ID),
     FOREIGN KEY (Seller_Email) REFERENCES Sellers(email),
-    FOREIGN KEY (Category) REFERENCES Categories(category_name)
+    -- ON UPDATE CASCADE keeps listings consistent with helpdesk-driven category renames.
+    -- ON DELETE RESTRICT prevents category deletion from silently wiping auction history (BR-9).
+    FOREIGN KEY (Category) REFERENCES Categories(category_name) ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS Bids (

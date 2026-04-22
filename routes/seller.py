@@ -19,9 +19,10 @@ def welcome():
 def dashboard():
     email = session['email']
     bal = query_db('SELECT balance from Sellers WHERE email = ?', [email], one=True)
-
+    bal = bal or {'balance': 0.00} # if bal is none, default to 0 balance
+    
     #we also want to show the active current active listings of the seller along with some details
-    active_listings = query_db('''SELECT l.Listing_ID, l.Auction_Title, l.Product_Name, l.Category, l.Reserve_Price, l.Max_bids
+    active_listings = query_db('''SELECT l.Listing_ID, l.Auction_Title, l.Product_Name, l.Category, l.Reserve_Price, l.Max_bids, l.is_promoted
         FROM Auction_Listings l 
         WHERE l.Seller_Email = ? AND Status = 1''', [email]) # use triple quotes instead to fix bug of wrapping
         
@@ -42,7 +43,8 @@ def dashboard():
             'Reserve_Price': listing['Reserve_Price'],     
             'Max_bids': listing['Max_bids'],               
             'bid_count': bidding_information['bid_count'],            
-            'highest_bid': bidding_information['highest_bid']
+            'highest_bid': bidding_information['highest_bid'],
+            'is_promoted': listing['is_promoted'] or 0 # default to 0 if is_promoted is None
         })
 
     #also want to retrieve sold listings for the specific seller, along with transaction status
@@ -381,3 +383,37 @@ def request_category():
                               ORDER BY request_id DESC''', [email])
 
     return render_template('seller/request_category.html', root_categories=root_categories, category_hierarchy=category_hierarchy, my_requests=my_requests)
+
+@seller_bp.route('/promote/<int:listing_id>', methods=['POST'])
+def promote_listing(listing_id):
+    email = session['email']
+    
+    listing = query_db('''SELECT * FROM Auction_Listings 
+                         WHERE Seller_Email = ? AND Listing_ID = ?''', 
+                         [email, listing_id], one=True)
+    
+    if not listing:
+        flash('Listing not found.', 'danger')
+        return redirect(url_for('seller.dashboard'))
+    
+    if listing['is_promoted']:
+        flash('This listing is already promoted.', 'warning')
+        return redirect(url_for('seller.dashboard'))
+
+    if listing['Status'] != 1:
+        flash('Only active listings can be promoted.', 'danger')
+        return redirect(url_for('seller.dashboard'))
+
+    promotion_fee = round(listing['Reserve_Price'] * 0.05, 2)
+
+    db = get_db()
+    db.execute('''UPDATE Auction_Listings 
+                  SET is_promoted = 1, promotion_fee = ?, promotion_time = CURRENT_TIMESTAMP
+                  WHERE Seller_Email = ? AND Listing_ID = ?''',
+                  [promotion_fee, email, listing_id])
+    db.execute('UPDATE Sellers SET balance = balance - ? WHERE email = ?',
+                  [promotion_fee, email])
+    db.commit()
+
+    flash(f'Listing promoted! A fee of ${promotion_fee} has been charged.', 'success')
+    return redirect(url_for('seller.dashboard'))
