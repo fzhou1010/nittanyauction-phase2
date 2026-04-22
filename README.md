@@ -74,8 +74,8 @@ and the `zipcode → city, state` dependency is captured by `Zipcode_Info` so
 `Address` doesn't repeat it. Foreign keys are turned on at every connection
 (`db.py` `get_db`).
 
-Team-added tables: `Questions` (product Q&A), `Watchlist` (saved searches),
-`Shopping_Cart` (persisted cart), and `Notifications` (in-app alerts). Two columns
+Team-added tables: `Questions` (product Q&A), `Shopping_Cart` (persisted cart),
+and `Notifications` (in-app alerts). Two columns
 were added to `Auction_Listings` to record removal audit info (`remaining_bids`,
 `reason_of_removal`) and three to track promotion state (`is_promoted`,
 `promotion_fee`, `promotion_time`). `Categories` is self-referential with
@@ -143,5 +143,5 @@ python app.py
 ```
 
 `load_data.py` recreates the file every run, so there's no stale-state failure
-mode. The team-added tables (`Questions`, `Watchlist`, `Shopping_Cart`,
-`Notifications`) start empty and get populated through normal use of the app.
+mode. The team-added tables (`Questions`, `Shopping_Cart`, `Notifications`) start
+empty and get populated through normal use of the app.
