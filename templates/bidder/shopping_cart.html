@@ -2,6 +2,7 @@
 {% block title %}My Shopping Cart - NittanyAuction{% endblock %}
 
 {% block content %}
+{% import "listings/listing.html" as listing_macro %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="mb-0">My Shopping Cart</h2>
     <a href="{{ url_for('listings.browse') }}" class="btn btn-outline-primary btn-sm">Browse Listings</a>
@@ -46,7 +47,12 @@
                         </a>
                         <div class="small text-muted">{{ item.category }}</div>
                     </td>
-                    <td class="small">{{ item.seller_email }}</td>
+                    <td class="small">
+                        {{ item.seller_email }}
+                        {% if item.avg_rating is not none %}
+                            <div>{{ listing_macro.render_stars(item.avg_rating, item.rating_count) }}</div>
+                        {% endif %}
+                    </td>
                     <td>
                         {% if item.current_bid %}
                             ${{ item.current_bid }}

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Seller Dashboard{% endblock %}
 {% block content %}
+{% import "listings/listing.html" as listing_macro %}
 <div class="row justify-content-center mt-5">
     <div class="col-md-6 text-center mb-5">
         <h2 class="">Seller Dashboard</h2>
@@ -21,7 +22,8 @@
             <div class="card h-100 text-center p-3 role-card">
                 <div class="card-body">
                     {% if seller_rating['count'] > 0 %}
-                        <div class="card-title fs-3"><strong>{{seller_rating['avg_rating']}}/5</strong></div>
+                        <div class="card-title fs-3"><strong>{{ "%.2f"|format(seller_rating['avg_rating']) }}/5</strong></div>
+                        <div class="fs-5 mb-1">{{ listing_macro.render_stars(seller_rating['avg_rating'], size='md') }}</div>
                         <div class="card-text">{{seller_rating['count']}} Ratings</div>
                     {% else %}
                         <div class="card-title fs-3"><strong>No Ratings</strong></div>
@@ -70,8 +72,8 @@
                         <th>Product</th>
                         <th>Category</th>
                         <th class="text-center">Bids</th>
-                        <th class="text-end text-nowrap">Highest Bid</th>
-                        <th class="text-end">Reserve</th>
+                        <th class="text-center text-nowrap">Highest Bid</th>
+                        <th class="text-center">Reserve</th>
                         <th class="text-center">Promoted</th>
                         <th></th>
                     </tr>
@@ -88,14 +90,14 @@
                         <td>{{ listing['Product_Name'] }}</td>
                         <td>{{ listing['Category'] }}</td>
                         <td class="text-center text-nowrap">{{ listing['bid_count'] }} / {{ listing['Max_bids'] }}</td>
-                        <td class="text-end text-nowrap">
+                        <td class="text-center text-nowrap">
                             {% if listing['highest_bid'] %}
                                 ${{ "%.2f"|format(listing['highest_bid']) }}
                             {% else %}
                                 <span class="text-muted">No bids</span>
                             {% endif %}
                         </td>
-                        <td class="text-end text-nowrap">${{ "%.2f"|format(listing['Reserve_Price']) }}</td>
+                        <td class="text-center text-nowrap">${{ "%.2f"|format(listing['Reserve_Price']) }}</td>
                         <td class="text-center">
                             {% if listing['is_promoted'] %}
                                 <span class="badge bg-warning text-dark">

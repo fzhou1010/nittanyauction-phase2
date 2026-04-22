@@ -149,10 +149,12 @@ def browse():
             SELECT Auction_Listings.*,
                 (SELECT MAX(Bid_Price) FROM Bids b
                  WHERE b.Seller_Email = Auction_Listings.Seller_Email
-                   AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
+                   AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid,
+                sar.Avg_Rating, sar.Rating_Count
             FROM Auction_Listings
             LEFT JOIN Bidders bd ON Auction_Listings.Seller_Email = bd.email
             LEFT JOIN Local_Vendors lv ON Auction_Listings.Seller_Email = lv.email
+            LEFT JOIN Seller_Avg_Rating sar ON sar.Seller_Email = Auction_Listings.Seller_Email
             {search_where}
               AND Auction_Listings.is_promoted = 1
             ORDER BY Auction_Listings.promotion_time DESC
@@ -166,10 +168,12 @@ def browse():
             SELECT Auction_Listings.*,
                 (SELECT MAX(Bid_Price) FROM Bids b
                  WHERE b.Seller_Email = Auction_Listings.Seller_Email
-                   AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
+                   AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid,
+                sar.Avg_Rating, sar.Rating_Count
             FROM Auction_Listings
             LEFT JOIN Bidders bd ON Auction_Listings.Seller_Email = bd.email
             LEFT JOIN Local_Vendors lv ON Auction_Listings.Seller_Email = lv.email
+            LEFT JOIN Seller_Avg_Rating sar ON sar.Seller_Email = Auction_Listings.Seller_Email
             {search_where}
             ''',
             search_params,
@@ -195,11 +199,13 @@ def browse():
         placeholders = ','.join(['?'] * len(cats))
         listings = query_db(
             f'''
-            SELECT *,
+            SELECT Auction_Listings.*,
                 (SELECT MAX(Bid_Price) FROM Bids b
                  WHERE b.Seller_Email = Auction_Listings.Seller_Email
-                   AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
+                   AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid,
+                sar.Avg_Rating, sar.Rating_Count
             FROM Auction_Listings
+            LEFT JOIN Seller_Avg_Rating sar ON sar.Seller_Email = Auction_Listings.Seller_Email
             WHERE Status = 1 AND Category IN ({placeholders}) AND (is_promoted IS NULL OR is_promoted = 0)
             ''',
             cats,
@@ -218,11 +224,13 @@ def browse():
 
     if not category:
         promoted_listings = query_db('''
-            SELECT *,
+            SELECT Auction_Listings.*,
                 (SELECT MAX(Bid_Price) FROM Bids b
                 WHERE b.Seller_Email = Auction_Listings.Seller_Email
-                AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
-            FROM Auction_Listings 
+                AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid,
+                sar.Avg_Rating, sar.Rating_Count
+            FROM Auction_Listings
+            LEFT JOIN Seller_Avg_Rating sar ON sar.Seller_Email = Auction_Listings.Seller_Email
             WHERE is_promoted = 1 AND Status = 1
             ORDER BY promotion_time DESC
         ''')
@@ -230,12 +238,14 @@ def browse():
         all_cats = get_all_subcategories(category)
         placeholders = ','.join('?' * len(all_cats))
         promoted_listings = query_db(f'''
-            SELECT *,
+            SELECT Auction_Listings.*,
                 (SELECT MAX(Bid_Price) FROM Bids b
                 WHERE b.Seller_Email = Auction_Listings.Seller_Email
-                AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
-            FROM Auction_Listings 
-            WHERE is_promoted = 1 AND Status = 1 
+                AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid,
+                sar.Avg_Rating, sar.Rating_Count
+            FROM Auction_Listings
+            LEFT JOIN Seller_Avg_Rating sar ON sar.Seller_Email = Auction_Listings.Seller_Email
+            WHERE is_promoted = 1 AND Status = 1
             AND Category IN ({placeholders})
             ORDER BY promotion_time DESC
         ''', all_cats)
