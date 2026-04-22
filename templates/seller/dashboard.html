@@ -101,6 +101,11 @@
                                 <span class="badge bg-warning text-dark">
                                     <i></i>Featured
                                 </span>
+                            {% elif not has_card %}
+                                <a href="{{ url_for('auth.profile') }}" class="btn btn-sm btn-outline-secondary text-nowrap"
+                                    onclick="return confirm('You need a credit card on file to promote a listing. Go to your profile to add one.')">
+                                    <i class="bi bi-megaphone me-1"></i>Promote
+                                </a>
                             {% else %}
                                 {% set fee = "%.2f"|format(listing['Reserve_Price'] * 0.05) %}
                                 <form action="{{ url_for('seller.promote_listing', listing_id=listing['Listing_ID']) }}" method="POST">

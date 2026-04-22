@@ -20,6 +20,8 @@ def dashboard():
     email = session['email']
     bal = query_db('SELECT balance from Sellers WHERE email = ?', [email], one=True)
     bal = bal or {'balance': 0.00} # if bal is none, default to 0 balance
+
+    has_card = query_db('SELECT 1 FROM Credit_Cards WHERE Owner_email = ?', [email], one=True) is not None
     
     #we also want to show the active current active listings of the seller along with some details
     active_listings = query_db('''SELECT l.Listing_ID, l.Auction_Title, l.Product_Name, l.Category, l.Reserve_Price, l.Max_bids, l.is_promoted
@@ -83,7 +85,7 @@ def dashboard():
                              WHERE Seller_Email = ?''', [email], one=True)
     
     return render_template('seller/dashboard.html', bal=bal, active_listings=active_listing_details, sold_listings=sold_listings_details,
-                           q_count=q_count, seller_rating=seller_rating, inactive_listings=inactive_listings)
+                           q_count=q_count, seller_rating=seller_rating, inactive_listings=inactive_listings, has_card=has_card)
 
 # Initial Step of Creating a Listing, Selecting a Category
 @seller_bp.route('/list_product', methods=['GET', 'POST'])
@@ -427,6 +429,12 @@ def request_category():
 @seller_bp.route('/promote/<int:listing_id>', methods=['POST'])
 def promote_listing(listing_id):
     email = session['email']
+
+    card = query_db('SELECT 1 FROM Credit_Cards WHERE Owner_email = ?', [email], one=True)
+
+    if not card:
+        flash('You must have a credit card on file to promote a listing.', 'danger')
+        return redirect(url_for('seller.dashboard'))
     
     listing = query_db('''SELECT * FROM Auction_Listings 
                          WHERE Seller_Email = ? AND Listing_ID = ?''', 
@@ -451,8 +459,7 @@ def promote_listing(listing_id):
                   SET is_promoted = 1, promotion_fee = ?, promotion_time = CURRENT_TIMESTAMP
                   WHERE Seller_Email = ? AND Listing_ID = ?''',
                   [promotion_fee, email, listing_id])
-    db.execute('UPDATE Sellers SET balance = balance - ? WHERE email = ?',
-                  [promotion_fee, email])
+
     db.commit()
 
     flash(f'Listing promoted! A fee of ${promotion_fee} has been charged.', 'success')

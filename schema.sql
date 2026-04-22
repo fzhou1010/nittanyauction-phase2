@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS Credit_Cards (
     expire_year INTEGER NOT NULL,
     security_code TEXT NOT NULL,
     Owner_email TEXT NOT NULL,
-    FOREIGN KEY (Owner_email) REFERENCES Bidders(email)
+    FOREIGN KEY (Owner_email) REFERENCES Users(email)
 );
 
 CREATE TABLE IF NOT EXISTS Sellers (
