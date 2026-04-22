@@ -55,7 +55,13 @@
                     {% else %}
                         {% for n in nav_recent_notifications %}
                         <li>
-                            {% if n.seller_email and n.listing_id %}
+                            {% if n.notif_type == 'rating_available' %}
+                            <a class="dropdown-item text-wrap small {% if not n.is_read %}fw-bold{% endif %}"
+                               href="{{ url_for('bidder.auction_history') }}">
+                                {{ n.message }}
+                                <div class="text-muted small fw-normal">{{ n.created_at }}</div>
+                            </a>
+                            {% elif n.seller_email and n.listing_id %}
                             <a class="dropdown-item text-wrap small {% if not n.is_read %}fw-bold{% endif %}"
                                href="{{ url_for('listings.detail', seller_email=n.seller_email, listing_id=n.listing_id) }}">
                                 {{ n.message }}

@@ -242,7 +242,7 @@
                             </td>
                             <td>{{ review.Bidder_Email }}</td>
                             <td>{{ review.Rating_Desc }}</td>
-                            <td>{{ review.Date }}</td>
+                            <td>{{ review.Date|displaydate }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>

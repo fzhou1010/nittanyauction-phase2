@@ -125,24 +125,43 @@ def browse():
 
 
 
-    # Flat search bypasses the hierarchy entirely
-    if search:
-        like = f'%{search}%'
-        search_where = '''
+    # Flat search bypasses the hierarchy entirely. Entering search mode when the
+    # user submits only a price filter (with no keyword) makes the price filter
+    # actually do something — otherwise the form submit bounced back to hierarchy
+    # mode and silently discarded the filter.
+    has_price_filter = price_min is not None or price_max is not None
+    if search or has_price_filter:
+        like = f'%{search}%' if search else '%'
+        # Price-range filter: COALESCE Current_Bid to 0 so listings that have received
+        # no bids yet (Current_Bid IS NULL) aren't silently dropped when the user sets
+        # a max. Without this, `NULL <= max` evaluates to NULL (falsy) and the ~95% of
+        # active listings that have no bids disappear the moment any filter is applied.
+        category_clause = ''
+        category_params = []
+        if category:
+            cats = get_all_subcategories(category)
+            ph = ','.join(['?'] * len(cats))
+            category_clause = f' AND Auction_Listings.Category IN ({ph})'
+            category_params = list(cats)
+        search_where = f'''
             WHERE Status = 1
               AND (Auction_Listings.Auction_Title LIKE ?
                     OR Auction_Listings.Product_Name LIKE ?
                     OR Auction_Listings.Product_Description LIKE ?
                     OR Auction_Listings.Category LIKE ?
+                    OR Auction_Listings.Seller_Email LIKE ?
                     OR bd.first_name LIKE ?
                     OR bd.last_name LIKE ?
                     OR lv.business_name LIKE ?)
                 AND (
                     (? IS NULL AND ? IS NULL)
                 OR
-                    (Current_Bid <= COALESCE(?, 99999999) AND Current_Bid >= COALESCE(?, 0)))
+                    (COALESCE(Current_Bid, 0) <= COALESCE(?, 99999999)
+                     AND COALESCE(Current_Bid, 0) >= COALESCE(?, 0)))
+                {category_clause}
         '''
-        search_params = [like, like, like, like, like, like, like, price_max, price_min, price_max, price_min]
+        search_params = [like, like, like, like, like, like, like, like,
+                         price_max, price_min, price_max, price_min] + category_params
 
         promoted_listings = query_db(
             f'''
@@ -184,6 +203,7 @@ def browse():
             'listings/browse.html',
             mode='search', search=search, listings=listings,
             promoted_listings=promoted_listings,
+            current_category=category,
         )
 
     # Hierarchy mode: dynamically fetch subcategories of the current node
@@ -326,10 +346,24 @@ def detail(seller_email, listing_id):
         [session['email'], seller_email, listing_id], one=True,
     ) is not None
 
-    reviews = query_db(
+    review_rows = query_db(
         "SELECT * FROM Rating WHERE Seller_Email = ?",
         [seller_email]
     )
+    # Rating.Date is stored as TEXT in mixed formats (seed uses 'M/D/YY', our
+    # code writes ISO 'YYYY-MM-DD'), so ORDER BY Date sorts lexicographically
+    # and produces garbage. Parse in Python and sort newest-first for display.
+    from datetime import datetime
+    def _parse_rating_date(s):
+        if not s:
+            return datetime.min
+        for fmt in ('%Y-%m-%d', '%m/%d/%y', '%m/%d/%Y'):
+            try:
+                return datetime.strptime(str(s).strip(), fmt)
+            except ValueError:
+                continue
+        return datetime.min
+    reviews = sorted(review_rows, key=lambda r: _parse_rating_date(r['Date']), reverse=True)
 
     avg_rating = query_db(
         "SELECT Avg_Rating FROM Seller_Avg_Rating WHERE Seller_Email = ?",
@@ -549,5 +583,16 @@ def pay(seller_email, listing_id):
     )
     db.commit()
 
-    flash('Payment successful! Transaction recorded.')
+    # Nudge the buyer to leave a rating. Rating stays available in auction history
+    # for as long as they want — this notification exists so they discover it.
+    # notify() doesn't commit, so we follow it with an explicit commit.
+    title = listing['Auction_Title'] or listing['Product_Name'] or 'your purchase'
+    notify(
+        email, 'rating_available',
+        f'Thanks for your purchase! Rate {seller_email} for "{title}" in your Auction History whenever you\'re ready.',
+        seller_email, listing_id,
+    )
+    db.commit()
+
+    flash('Payment successful! You can rate the seller any time from your Auction History.')
     return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))

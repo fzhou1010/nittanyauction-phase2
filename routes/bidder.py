@@ -221,11 +221,12 @@ def rate_seller(seller_email, listing_id):
 
     # BR-15: at most one rating per completed auction. Schema also enforces this
     # via a partial unique index, but the early check gives a clean message.
-    already_rated = query_db(
-        'SELECT 1 FROM Rating '
+    existing_rating = query_db(
+        'SELECT Rating, Rating_Desc, Date FROM Rating '
         'WHERE Bidder_Email = ? AND Seller_Email = ? AND Listing_ID = ?',
         [email, seller_email, listing_id], one=True,
-    ) is not None
+    )
+    already_rated = existing_rating is not None
 
     if request.method == 'POST':
         if already_rated:
@@ -259,6 +260,7 @@ def rate_seller(seller_email, listing_id):
         listing=listing,
         listing_id=listing_id,
         already_rated=already_rated,
+        existing_rating=existing_rating,
         form={},
     )
 
