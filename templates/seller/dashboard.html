@@ -160,6 +160,7 @@
                     </tr>
                 </thead>
                 <tbody>
+                    <!-- add new status so we know whether its removed or has been canceled due to reserve price reasons -->
                     {% for listing in inactive_listings %}
                     <tr>
                         <td><span class="badge bg-warning text-danger">Removed</span></td>
@@ -171,11 +172,11 @@
                         <td>{{ listing['Product_Name'] }}</td>
                         <td>{{ listing['Category'] }}</td>
                         <td>{{ listing['remaining_bids']}}</td>
-                        <td> {{ listing['reason_of_removal'] }}</td>
+                        <td>{{ listing['reason_of_removal'] }}</td>
                     </tr>
                     {%else%}
                     <tr>
-                        <td colspan="5" class="col-md-6 text-center text-muted p-3">There are no inactive listings currently</td>
+                        <td colspan="6" class="col-md-6 text-center text-muted p-3">There are no inactive listings currently</td>
                     </tr>
                     {% endfor %}
                 </tbody>

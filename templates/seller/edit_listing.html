@@ -31,6 +31,9 @@
                                 <option value="{{ category['category_name'] }}">{{ category['category_name'] }}</option>
                                 {% endfor %}
                             </select>
+                            <small class="text-muted">Unable to find category befitting?
+                            <a href="{{url_for('seller.request_category')}}">Request a one here</a>
+                        </small>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Auction Title</label>
@@ -50,7 +53,7 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Condition</label>
-                                <select class="form-select" name="condition">
+                                <select class="form-select" name="condition" required>
                                     {% if listing['Condition'] == 'new'%}
                                     <option value="new" selected>Current Condition: New</option>
                                     <option value="new">New</option>

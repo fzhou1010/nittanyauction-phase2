@@ -167,9 +167,16 @@
 
                 <form class="mt-auto" action="{{ url_for('listings.ask_question', seller_email=listing.Seller_Email, listing_id=listing.Listing_ID) }}" method="post">
                     <div class="input-group">
+                        <!-- Sellers shouldn't be able to ask questions regarding their own listings -->
+                        {% if session.get('email') != listing.Seller_Email %}
                         <textarea name="question" class="form-control" rows="1" style="resize: none;"
                                   placeholder="Ask a question about this listing" required></textarea>
                         <button type="submit" class="btn btn-primary">Submit</button>
+                        {%else%}
+                        <textarea name="question" class="form-control" rows="1" style="resize: none;"
+                                  placeholder="Ask a question about this listing" required disabled></textarea>
+                        <button type="submit" class="btn btn-primary" disabled>Submit</button>
+                        {%endif%}
                     </div>
                 </form>
             </div>
