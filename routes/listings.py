@@ -135,13 +135,14 @@ def browse():
                     OR Auction_Listings.Product_Description LIKE ?
                     OR Auction_Listings.Category LIKE ?
                     OR bd.first_name LIKE ?
-                    OR bd.last_name LIKE ?)
+                    OR bd.last_name LIKE ?
+                    OR lv.business_name LIKE ?)
                 AND (
                     (? IS NULL AND ? IS NULL)
                 OR
                     (Current_Bid <= COALESCE(?, 99999999) AND Current_Bid >= COALESCE(?, 0)))
         '''
-        search_params = [like, like, like, like, like, like, price_max, price_min, price_max, price_min]
+        search_params = [like, like, like, like, like, like, like, price_max, price_min, price_max, price_min]
 
         promoted_listings = query_db(
             f'''
@@ -150,7 +151,8 @@ def browse():
                  WHERE b.Seller_Email = Auction_Listings.Seller_Email
                    AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
             FROM Auction_Listings
-            JOIN Bidders bd ON Auction_Listings.Seller_Email = bd.email
+            LEFT JOIN Bidders bd ON Auction_Listings.Seller_Email = bd.email
+            LEFT JOIN Local_Vendors lv ON Auction_Listings.Seller_Email = lv.email
             {search_where}
               AND Auction_Listings.is_promoted = 1
             ORDER BY Auction_Listings.promotion_time DESC
@@ -166,7 +168,8 @@ def browse():
                  WHERE b.Seller_Email = Auction_Listings.Seller_Email
                    AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
             FROM Auction_Listings
-            JOIN Bidders bd ON Auction_Listings.Seller_Email = bd.email
+            LEFT JOIN Bidders bd ON Auction_Listings.Seller_Email = bd.email
+            LEFT JOIN Local_Vendors lv ON Auction_Listings.Seller_Email = lv.email
             {search_where}
             ''',
             search_params,
@@ -188,16 +191,18 @@ def browse():
 
     listings = []
     if category:
+        cats = get_all_subcategories(category)
+        placeholders = ','.join(['?'] * len(cats))
         listings = query_db(
-            '''
+            f'''
             SELECT *,
                 (SELECT MAX(Bid_Price) FROM Bids b
                  WHERE b.Seller_Email = Auction_Listings.Seller_Email
                    AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
             FROM Auction_Listings
-            WHERE Status = 1 AND Category = ? AND (is_promoted IS NULL OR is_promoted = 0)
+            WHERE Status = 1 AND Category IN ({placeholders}) AND (is_promoted IS NULL OR is_promoted = 0)
             ''',
-            [category],
+            cats,
         )
 
     # Walk parents to build breadcrumb (root → current)
@@ -479,6 +484,29 @@ def pay(seller_email, listing_id):
         return render_template(
             'listings/payment.html', listing=listing, amount=amount, cards=cards,
         )
+
+    if request.form.get('form_type') == 'add_card':
+        credit_card_num = request.form.get('credit_card_num', '').strip()
+        card_type = request.form.get('card_type', '').strip()
+        expire_month = request.form.get('expire_month')
+        expire_year = request.form.get('expire_year')
+        security_code = request.form.get('security_code', '').strip()
+        if not (credit_card_num and card_type and expire_month and expire_year and security_code):
+            flash('Please fill out every card field.', 'danger')
+            return redirect(url_for('listings.pay', seller_email=seller_email, listing_id=listing_id))
+        import sqlite3
+        try:
+            db = get_db()
+            db.execute(
+                'INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email) '
+                'VALUES (?, ?, ?, ?, ?, ?)',
+                [credit_card_num, card_type, expire_month, expire_year, security_code, email],
+            )
+            db.commit()
+            flash('Card added.', 'success')
+        except sqlite3.IntegrityError:
+            flash('That card number is already on file.', 'danger')
+        return redirect(url_for('listings.pay', seller_email=seller_email, listing_id=listing_id))
 
     selected_card = request.form.get('credit_card_num', '').strip()
     valid_card = query_db(

@@ -55,22 +55,22 @@
     
     <!-- Bid section -->
     <div class="col-lg-4 d-flex">
-        <div class="card mb-3 w-100 h-100">
+        <div class="card mb-3 w-100 h-100{% if listing.Status == 2 %} border-success bg-success-subtle{% endif %}">
             <div class="card-body d-flex flex-column justify-content-center">
                 {% if listing.Status == 2 %}
                     {# ── Auction sold ── #}
-                    <div class="alert alert-success mb-3">
-                        <h5 class="alert-heading text-center">Auction Ended &mdash; Sold</h5>
-                        {% if winner_email == session.get('email') and not has_paid %}
-                            <p>You won this auction for <strong>${{ bids[0].Bid_Price }}</strong>.</p>
+                    <h5 class="text-center text-success-emphasis">Auction Ended &mdash; Sold</h5>
+                    {% if winner_email == session.get('email') and not has_paid %}
+                        <p class="text-center mb-3">You won this auction for <strong>${{ bids[0].Bid_Price }}</strong>.</p>
+                        <div class="text-center">
                             <a href="{{ url_for('listings.pay', seller_email=listing.Seller_Email, listing_id=listing.Listing_ID) }}"
                                class="btn btn-success">Proceed to Payment</a>
-                        {% elif winner_email == session.get('email') and has_paid %}
-                            <p>You won and paid <strong>${{ bids[0].Bid_Price }}</strong>. Transaction complete.</p>
-                        {% else %}
-                            <p>This auction has been sold to another bidder.</p>
-                        {% endif %}
-                    </div>
+                        </div>
+                    {% elif winner_email == session.get('email') and has_paid %}
+                        <p class="text-center mb-0">You won and paid <strong>${{ bids[0].Bid_Price }}</strong>. Transaction complete.</p>
+                    {% else %}
+                        <p class="text-center mb-0">This auction has been sold to another bidder.</p>
+                    {% endif %}
 
                 {% elif listing.Status == 0 %}
                     {# ── Auction failed / removed ── #}

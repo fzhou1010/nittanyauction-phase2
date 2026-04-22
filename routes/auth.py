@@ -118,6 +118,12 @@ def register_form(role):
         # we want to get the corresponding data for the specific roles
         db = get_db()
         if role == 'bidder':
+            required = ['first_name', 'last_name', 'phone', 'street_num', 'street_name', 'zipcode', 'city', 'state',
+                        'credit_card_num', 'card_type', 'expire_month', 'expire_year', 'security_code']
+            missing = [f for f in required if not request.form.get(f, '').strip()]
+            if missing:
+                flash('Please fill in all required fields: ' + ', '.join(missing))
+                return render_template('auth/register_form.html', role=role)
             first_name = request.form['first_name']
             last_name = request.form['last_name']
             age = request.form.get('age') # we can use .get from the forms as these fields are not mandatory to the user signing up to use the page
@@ -161,6 +167,13 @@ def register_form(role):
                 return render_template('auth/register_form.html', role=role)
             
         elif role == 'student_seller':
+            required = ['first_name', 'last_name', 'phone', 'street_num', 'street_name', 'zipcode', 'city', 'state',
+                        'credit_card_num', 'card_type', 'expire_month', 'expire_year', 'security_code',
+                        'bank_account_num', 'bank_routing_num']
+            missing = [f for f in required if not request.form.get(f, '').strip()]
+            if missing:
+                flash('Please fill in all required fields: ' + ', '.join(missing))
+                return render_template('auth/register_form.html', role=role)
             first_name = request.form['first_name']
             last_name = request.form['last_name']
             age = request.form.get('age') # we can use .get from the forms as these fields are not mandatory to the user signing up to use the page
@@ -202,6 +215,12 @@ def register_form(role):
                 flash('Error saving information into the database.')
                 return render_template('auth/register_form.html', role=role)
         else: #means that the role is local_vendor
+            required = ['business_name', 'cs_phone_num', 'street_num', 'street_name', 'zipcode', 'city', 'state',
+                        'bank_account_num', 'bank_routing_num']
+            missing = [f for f in required if not request.form.get(f, '').strip()]
+            if missing:
+                flash('Please fill in all required fields: ' + ', '.join(missing))
+                return render_template('auth/register_form.html', role=role)
             business_name = request.form['business_name']
             cs_phone_num = request.form['cs_phone_num']
             #business address information, saved to the address table
