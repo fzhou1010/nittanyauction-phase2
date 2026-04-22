@@ -255,20 +255,42 @@ def profile():
         return redirect(url_for('auth.login'))
 
     user_email = session['email']
+    role = session.get('role')
     db = get_db()
 
+    # Always try Bidders first for name info since student sellers are in both tables
     user_info = query_db('''
         SELECT first_name, last_name, age, major, home_address_id 
-        FROM Bidders 
-        WHERE email = ?''', [user_email], one=True)
+        FROM Bidders WHERE email = ?''', [user_email], one=True)
+
+    # Get address_id based on role
+    if role == 'seller':
+        vendor_info = query_db('SELECT business_address_id FROM Local_Vendors WHERE email = ?', [user_email], one=True)
+        address_id = vendor_info['business_address_id'] if vendor_info else None
+        # fall back to bidder address if they're also a bidder
+        if not address_id and user_info:
+            address_id = user_info['home_address_id']
+    elif role == 'helpdesk':
+        user_info = query_db('SELECT email, position FROM Helpdesk WHERE email = ?', [user_email], one=True)
+        # helpdesk may also be a bidder or seller, try to get their address from those tables
+        bidder_info = query_db('SELECT first_name, last_name, home_address_id FROM Bidders WHERE email = ?', [user_email], one=True)
+        if bidder_info:
+            user_info = bidder_info  # use bidder info for name display too
+            address_id = bidder_info['home_address_id']
+        else:
+            seller_info = query_db('SELECT home_address_id FROM Sellers WHERE email = ?', [user_email], one=True)
+            address_id = seller_info['home_address_id'] if seller_info else None
+    else:  # bidder
+        address_id = user_info['home_address_id'] if user_info else None
 
     address_info = None
-    if user_info and user_info['home_address_id']:
+    if address_id:
         address_info = query_db('''
-            SELECT a.*, z.city, z.state
+            SELECT a.street_num, a.street_name, a.zipcode, a.address_id,
+                   COALESCE(z.city, '') as city, COALESCE(z.state, '') as state
             FROM Address a
-            JOIN Zipcode_Info z ON a.zipcode = z.zipcode
-            WHERE a.address_id = ?''', [user_info['home_address_id']], one=True)
+            LEFT JOIN Zipcode_Info z ON a.zipcode = z.zipcode
+            WHERE a.address_id = ?''', [address_id], one=True)
 
     cards = query_db('SELECT * FROM Credit_Cards WHERE Owner_email = ?', [user_email])
 
@@ -282,24 +304,32 @@ def profile():
             city = request.form.get('city')
             state = request.form.get('state')
 
-            db.execute('INSERT OR IGNORE INTO Zipcode_Info (zipcode, city, state) VALUES (?, ?, ?)', 
+            db.execute('INSERT OR REPLACE INTO Zipcode_Info (zipcode, city, state) VALUES (?, ?, ?)', 
                        [zipcode, city, state])
 
-            db.execute('''
-                UPDATE Address
-                SET street_num = ?, street_name = ?, zipcode = ?
-                WHERE address_id = ?''',
-                [street_num, street_name, zipcode, user_info['home_address_id']])
-            
+            if address_id:
+                db.execute('''UPDATE Address SET street_num = ?, street_name = ?, zipcode = ?
+                            WHERE address_id = ?''',
+                            [street_num, street_name, zipcode, address_id])
+            else:
+                new_address_id = uuid.uuid4().hex
+                db.execute('INSERT INTO Address (address_id, zipcode, street_num, street_name) VALUES (?, ?, ?, ?)',
+                        [new_address_id, zipcode, street_num, street_name])
+                if user_info:  # bidder or student seller
+                    db.execute('UPDATE Bidders SET home_address_id = ? WHERE email = ?', 
+                            [new_address_id, user_email])
+                elif role == 'seller':
+                    is_vendor = query_db('SELECT 1 FROM Local_Vendors WHERE email = ?', [user_email], one=True)
+                    if is_vendor:
+                        db.execute('UPDATE Local_Vendors SET business_address_id = ? WHERE email = ?', 
+                                [new_address_id, user_email])
             db.commit()
             flash('Address updated successfully!', 'success')
 
         elif form_type == 'change_password':
             old_password = request.form.get('old_password')
             new_password = request.form.get('new_password')
-
             user_account = query_db('SELECT password FROM Users WHERE email = ?', [user_email], one=True)
-
             current_hashed = hashlib.sha256(old_password.encode('utf-8')).hexdigest()
             if user_account and user_account['password'] == current_hashed:
                 hashed_new = hashlib.sha256(new_password.encode('utf-8')).hexdigest()
@@ -316,24 +346,24 @@ def profile():
             expire_year = request.form.get('expire_year')
             security_code = request.form.get('security_code')
 
-            db.execute('''
-                INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email) 
+            existing_card = query_db('SELECT 1 FROM Credit_Cards WHERE credit_card_num = ?', [credit_card_num], one=True)
+
+            if existing_card:
+                flash('This credit card number is already associated with an account.', 'danger')
+            else:
+                db.execute('''INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email) 
                 VALUES (?, ?, ?, ?, ?, ?)''',
                 [credit_card_num, card_type, expire_month, expire_year, security_code, user_email])
-            db.commit()
-            flash('Card added successfully!', 'success')
+                db.commit()
+                flash('Card added successfully!', 'success')
 
         elif form_type == 'remove_card':
-            # BR-22: scope the DELETE to the session owner so a crafted form
-            # cannot remove another bidder's card.
             card_num = request.form.get('credit_card_num', '').strip()
             if not card_num:
                 flash('Missing card reference.', 'danger')
             else:
-                cur = db.execute(
-                    'DELETE FROM Credit_Cards WHERE credit_card_num = ? AND Owner_email = ?',
-                    [card_num, user_email],
-                )
+                cur = db.execute('DELETE FROM Credit_Cards WHERE credit_card_num = ? AND Owner_email = ?',
+                    [card_num, user_email])
                 db.commit()
                 if cur.rowcount:
                     flash('Card removed.', 'success')
