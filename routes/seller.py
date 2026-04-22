@@ -433,6 +433,9 @@ def request_category():
     # for each row item in all of the categories
     for cat in all_categories:
         parent = cat['parent_category']
+        # the category starts in root, which has a parent category of none
+        if parent is None:
+            continue
         if parent not in category_hierarchy: # if the parent category is not already in the dictonary as a key, make a key
             category_hierarchy[parent] = []
         #if the parent is already in the dictionary, add the category to the parent category key
