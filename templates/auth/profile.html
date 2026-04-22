@@ -42,7 +42,7 @@
                     <a class="list-group-item list-group-item-action" id="support-list" data-bs-toggle="list" href="#pane-support" role="tab">
                         <i class="bi bi-question-circle me-2"></i>Support
                     </a>
-                    {% if session.get('available_roles') %}
+                    {% if session.get('available_roles') and session['available_roles']|length > 1 %}
                     <a class="list-group-item list-group-item-action" id="role-list" data-bs-toggle="list" href="#pane-role" role="tab">
                         <i class="bi bi-arrow-left-right me-2"></i>Switch Role
                     </a>
