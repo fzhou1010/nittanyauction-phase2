@@ -310,7 +310,7 @@ def questions():
         FROM Questions Q, Auction_Listings l
         WHERE l.Seller_Email = ? AND q.Seller_Email = l.Seller_Email AND q.Listing_ID = l.Listing_ID AND q.answered = 0''', [email])
 
-    answered_questions = query_db('''SELECT q.question_id, q.Listing_Id, q.bidder_email, q.question_text, q.answer_text, q.answered, q.question_time, l.Auction_Title, l.Listing_ID
+    answered_questions = query_db('''SELECT q.question_id, q.Listing_Id, q.bidder_email, q.question_text, q.answer_text, q.answered, q.question_time, q.answer_time, l.Auction_Title, l.Listing_ID
         FROM Questions Q, Auction_Listings l
         WHERE l.Seller_Email = ? AND q.Seller_Email = l.Seller_Email AND q.Listing_ID = l.Listing_ID AND q.answered = 1''', [email])
     
@@ -329,8 +329,8 @@ def questions():
 def question(qid):
     # receiving the question answer from the seller regarding the listing
     email = session['email']
-    question = query_db('''SELECT q.question_id, q.Listing_ID, q.Bidder_Email, q.question_text, q.answer_text, q.answered, q.question_time, l.Auction_Title
-                            FROM Questions q, Auction_Listings l                                           
+    question = query_db('''SELECT q.question_id, q.Listing_ID, q.Bidder_Email, q.question_text, q.answer_text, q.answered, q.question_time, q.answer_time, l.Auction_Title
+                            FROM Questions q, Auction_Listings l
                             WHERE q.Seller_Email = l.Seller_Email AND q.Listing_ID = l.Listing_ID AND q.question_id = ? AND q.Seller_Email = ?''',
                           [qid, email], one=True) # returns one row of data per question
     #get the answer response from the form and save
@@ -341,7 +341,7 @@ def question(qid):
             return redirect(url_for('seller.question', qid=qid))
         #update the answer text for the question
         db = get_db()
-        db.execute('''UPDATE Questions SET answer_text = ?, answered = 1
+        db.execute('''UPDATE Questions SET answer_text = ?, answered = 1, answer_time = CURRENT_TIMESTAMP
                     WHERE question_id = ? AND Seller_Email = ?
                     ''', [answer_text, qid, email])
         notify(

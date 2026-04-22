@@ -279,7 +279,7 @@ def detail(seller_email, listing_id):
         current_cat = parent['parent_category'] if parent and parent['parent_category'] != ROOT_PARENT else None
 
     questions = query_db('''
-        SELECT question_text, answer_text, Bidder_Email, Question_time
+        SELECT question_text, answer_text, Bidder_Email, Question_time, answer_time
         FROM Questions
         WHERE Seller_Email = ? AND Listing_ID = ?
         ORDER BY Question_time DESC

@@ -156,6 +156,7 @@ CREATE TABLE IF NOT EXISTS Questions (
     answer_text TEXT,
     answered INTEGER DEFAULT 0, -- whether the question has been answered or not
     question_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    answer_time TIMESTAMP,
     FOREIGN KEY (Seller_Email, Listing_ID) REFERENCES Auction_Listings(Seller_Email, Listing_ID),
     FOREIGN KEY (Bidder_Email) REFERENCES Bidders(email)
 );

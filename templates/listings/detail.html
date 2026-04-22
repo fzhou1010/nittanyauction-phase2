@@ -155,6 +155,7 @@
                                     {% if q.answer_text %}
                                         <span class="fw-semibold text-success me-2">A</span>
                                         <span>{{ q.answer_text }}</span>
+                                        <small class="text-muted ms-auto ps-2">{{ q.answer_time }}</small>
                                     {% else %}
                                         <span class="fw-semibold text-danger me-2">A</span>
                                         <span class="text-muted fst-italic">Waiting for answer</span>
