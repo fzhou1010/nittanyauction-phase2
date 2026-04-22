@@ -26,7 +26,7 @@ def shopping_cart():
         SELECT
             c.Seller_Email, c.Listing_ID, c.added_at,
             al.Auction_Title, al.Product_Name, al.Category,
-            al.Max_bids, al.Reserve_Price, al.Status,
+            al.Max_bids, al.Status,
             (SELECT MAX(Bid_Price) FROM Bids b
                 WHERE b.Seller_Email = c.Seller_Email AND b.Listing_ID = c.Listing_ID) AS current_bid,
             (SELECT COUNT(*) FROM Bids b
@@ -53,7 +53,6 @@ def shopping_cart():
             'remaining_bids': max(r['Max_bids'] - bid_count, 0) if r['Max_bids'] else 0,
             'status': r['Status'],
             'status_label': STATUS_LABELS.get(r['Status'], 'Unknown'),
-            'reserve_price': r['Reserve_Price'],
         })
 
     return render_template('bidder/shopping_cart.html', items=items)
