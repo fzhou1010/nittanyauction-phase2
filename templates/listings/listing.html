@@ -1,6 +1,11 @@
 {% macro render_listing(item) %}
 <div class="col">
-    <div class="card h-100 shadow-sm" style="min-height: 13rem;">
+    <div class="card h-100 shadow-sm {% if item.is_promoted %}border-warning{% endif %}" style="min-height: 13rem;">
+        {% if item.is_promoted %}
+        <div class="card-header bg-warning text-dark py-1 small text-center" style="font-size: 0.7rem; letter-spacing: 0.03em;">
+            <i class="bi bi-star-fill me-1"></i>Featured
+        </div>
+        {% endif %}
         <div class="card-body p-2 d-flex flex-column" style="font-size: 0.85rem;">
             <div class="text-muted text-truncate" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em;">{{ item.Category or '—' }}</div>
             <div class="fw-semibold text-truncate" style="font-size: 0.95rem;" title="{{ item.Auction_Title }}">{{ item.Auction_Title or 'Untitled' }}</div>
@@ -9,7 +14,7 @@
             <div class="text-muted" style="font-size: 0.75rem;">Qty: {{ item.Quantity }}</div>
             <div class="mt-2 mb-2">
                 {% if item.Current_Bid %}
-                <span class="fw-semibold">${{ item.Current_Bid }}</span>
+                <span class="fw-semibold">${{ "%.2f"|format(item.Current_Bid) }}</span>
                 {% else %}
                 <span class="text-muted">No bids yet</span>
                 {% endif %}

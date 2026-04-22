@@ -23,7 +23,7 @@ load_data.py    → CSV → SQLite loader
 routes/
   auth.py       → login, register, logout, profile
   listings.py   → browse, search, listing detail, bid, Q&A
-  bidder.py     → credit cards, watchlist, auction history, ratings, seller application
+  bidder.py     → watchlist, shopping cart, auction history, ratings, seller application
   seller.py     → dashboard, list product, answer questions, category requests
   helpdesk.py   → request queue, category mgmt, analytics
 
