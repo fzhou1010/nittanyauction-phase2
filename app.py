@@ -39,6 +39,43 @@ def invalidate_stale_session():
         return redirect(url_for('auth.login'))
 
 
+# keep session['available_roles'] in sync with the DB so HelpDesk approvals apply without a relog
+@app.before_request
+def sync_available_roles():
+    if request.endpoint in (None, 'static', 'auth.login', 'auth.logout'):
+        return
+    email = session.get('email')
+    if not email:
+        return
+
+    current = []
+    if query_db('SELECT 1 FROM Bidders WHERE email = ?', [email], one=True):
+        current.append('bidder')
+    if query_db('SELECT 1 FROM Sellers WHERE email = ?', [email], one=True):
+        current.append('seller')
+    if query_db('SELECT 1 FROM Helpdesk WHERE email = ?', [email], one=True):
+        current.append('helpdesk')
+
+    prior = session.get('available_roles')
+    if prior is None or set(current) != set(prior):
+        newly_granted = [r for r in current if r not in (prior or [])]
+        session['available_roles'] = current
+
+        # drop active role if it was revoked
+        active = session.get('role')
+        if active and active not in current:
+            session.pop('role', None)
+            session['roles'] = [r for r in session.get('roles', []) if r in current]
+
+        # flash only for mid-session upgrades, not fresh logins or pending-user flow
+        if newly_granted and session.get('role'):
+            labels = ', '.join(r.capitalize() for r in newly_granted)
+            flash(
+                f'{labels} access has been approved. Switch via your profile to start using it.',
+                'success',
+            )
+
+
 @app.context_processor
 def inject_notifications():
     """Expose unread notification count and a short preview list to every template."""
