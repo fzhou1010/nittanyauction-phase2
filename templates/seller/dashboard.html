@@ -7,7 +7,7 @@
         <small>Welcome back, <strong>{{session['email']}}</strong></small>
     </div>
     <!-- Hero Section : Quick Access to some Aggregate Data-->
-    <div class="row col-md-8">
+    <div class="row col-md-10">
         <div class="col-md-4 mb-3">
             <div class="card h-100 text-center p-3 role-card">
                 
@@ -35,6 +35,7 @@
                 <div class="card-body">
                     <div class="card-title fs-3"><strong>{{q_count['q_count']}}</strong></div>
                     <div class="card-text">Unanswered Questions</div>
+                    <small class="text-primary">View Questions <i class="bi bi-arrow-right"></i></small>
                 </div>
             </div>
             </a>
@@ -42,9 +43,14 @@
     </div>
     <!-- Listing Dashboard -->
     <ul class="nav nav-tabs" role="tablist">
-        <li id="active_questions" class="nav-item">
+        <li id="active_listings" class="nav-item">
             <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#active_listings_table">
                 Active Listings
+            </button>
+        </li>
+        <li id="inactive_listings" class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#inactive_listings_table">
+                Inactive Listings
             </button>
         </li>
         <li id="answered_questions" class="nav-item">
@@ -131,6 +137,41 @@
                         </td>
                     </tr>
                     {%endif%}
+                </tbody>
+            </table>
+        </div>
+        <!-- inactive listings table -->
+         <div class="tab-pane fade table-responsive mt-3" id="inactive_listings_table">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Status</th>
+                        <th>Auction Title</th>
+                        <th>Product</th>
+                        <th>Category</th>
+                        <th>Remaining Bids</th>
+                        <th>Reason for Removal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for listing in inactive_listings %}
+                    <tr>
+                        <td><span class="badge bg-warning text-danger">Removed</span></td>
+                        <td>
+                            <a href="{{ url_for('listings.detail', seller_email=session['email'], listing_id=listing['Listing_ID']) }}" class="text-decoration-none hover-underline text-body">
+                                {{ listing['Auction_Title'] }}
+                            </a>
+                        </td>
+                        <td>{{ listing['Product_Name'] }}</td>
+                        <td>{{ listing['Category'] }}</td>
+                        <td>{{ listing['remaining_bids']}}</td>
+                        <td> {{ listing['reason_of_removal'] }}</td>
+                    </tr>
+                    {%else%}
+                    <tr>
+                        <td colspan="5" class="col-md-6 text-center text-muted p-3">There are no inactive listings currently</td>
+                    </tr>
+                    {% endfor %}
                 </tbody>
             </table>
         </div>
