@@ -30,13 +30,17 @@
 </div>
 
 {% if mode == 'search' %}
+    {% set total_results = (promoted_listings|length) + (listings|length) %}
     <p class="text-muted">
-        {{ listings|length }} result{{ 's' if listings|length != 1 }} for &ldquo;{{ search }}&rdquo;
+        {{ total_results }} result{{ 's' if total_results != 1 }} for &ldquo;{{ search }}&rdquo;
         &middot; <a href="{{ url_for('listings.browse') }}">Back to categories</a>
     </p>
 
-    {% if listings %}
-        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+    {% if promoted_listings or listings %}
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 row-cols-xl-5 g-3">
+            {% for listing in promoted_listings %}
+                {{ listing_macro.render_listing(listing) }}
+            {% endfor %}
             {% for listing in listings %}
                 {{ listing_macro.render_listing(listing) }}
             {% endfor %}
@@ -46,6 +50,8 @@
     {% endif %}
 
 {% else %}
+   
+
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
             <li class="breadcrumb-item">
@@ -66,6 +72,15 @@
             {% endfor %}
         </ol>
     </nav>
+
+    {% if not current_category and promoted_listings %}
+        <h5 class="text-muted mb-3">Featured Listings</h5>
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 row-cols-xl-5 g-3 mb-4">
+            {% for listing in promoted_listings %}
+                {{ listing_macro.render_listing(listing) }}
+            {% endfor %}
+        </div>
+    {% endif %}
 
     {% if subcategories %}
         <h5 class="text-muted mb-3">
@@ -93,8 +108,11 @@
             Listings in {{ current_category }}
             <span class="text-muted">({{ listings|length }})</span>
         </h5>
-        {% if listings %}
-            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+        {% if promoted_listings or listings %}
+            <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 row-cols-xl-5 g-3">
+                {% for listing in promoted_listings %}
+                    {{ listing_macro.render_listing(listing) }}
+                {% endfor %}
                 {% for listing in listings %}
                     {{ listing_macro.render_listing(listing) }}
                 {% endfor %}

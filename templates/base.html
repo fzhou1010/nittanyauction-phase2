@@ -16,6 +16,7 @@
             <!-- local vendors shouldnt be able to browse -->
             {% if 'bidder' in session.get('roles', []) %} <!-- this is because student sellers are also bidders by default -->
             <a class="nav-link" href="{{ url_for('listings.browse') }}">Browse</a>
+            {% endif %}
             <div class="nav-item dropdown">
                 <a class="nav-link position-relative" href="#" id="notifDropdown" role="button"
                    data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications">
@@ -32,7 +33,7 @@
                     <li class="dropdown-header d-flex justify-content-between align-items-center">
                         <span>Notifications</span>
                         {% if nav_unread_count and nav_unread_count > 0 %}
-                        <form method="post" action="{{ url_for('bidder.notifications_mark_read') }}"
+                        <form method="post" action="{{ url_for('notifications.mark_read') }}"
                               class="m-0">
                             <input type="hidden" name="next" value="{{ request.path }}">
                             <button type="submit" class="btn btn-link btn-sm p-0">Mark all read</button>
@@ -62,20 +63,19 @@
                     {% endif %}
                     <li><hr class="dropdown-divider"></li>
                     <li>
-                        <a class="dropdown-item text-center small" href="{{ url_for('bidder.notifications') }}">
+                        <a class="dropdown-item text-center small" href="{{ url_for('notifications.list') }}">
                             View all notifications
                         </a>
                     </li>
                 </ul>
             </div>
-            {% endif %}
             <a class="nav-link" href="{{ url_for('auth.profile') }}">{{ session['email'] }}</a>
             <a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a>
         </div>
         {% endif %}
     </div>
 </nav>
-<div class="container mt-3">
+<div class="container mt-3 pb-5">
     {% with messages = get_flashed_messages() %}
     {% if messages %}
     {% for msg in messages %}
@@ -89,6 +89,9 @@
 </body>
 <style>
     .nav-link:hover{
+        text-decoration: underline !important
+    }
+    .hover-underline:hover{
         text-decoration: underline !important
     }
 </style>

@@ -12,7 +12,7 @@ app.teardown_appcontext(close_db)                # Auto-close the DB connection 
 @app.context_processor
 def inject_notifications():
     """Expose unread notification count and a short preview list to every template."""
-    if 'email' not in session or 'bidder' not in session.get('roles', []):
+    if 'email' not in session:
         return {}
     unread_count = query_db(
         'SELECT COUNT(*) AS n FROM Notifications WHERE recipient_email = ? AND is_read = 0',
@@ -31,12 +31,14 @@ from routes.listings import listings_bp
 from routes.bidder import bidder_bp
 from routes.seller import seller_bp
 from routes.helpdesk import helpdesk_bp
+from routes.notifications import notifications_bp
 
 app.register_blueprint(auth_bp)                              # /login, /logout, /register, /profile
 app.register_blueprint(listings_bp)                          # /browse (auction listings)
-app.register_blueprint(bidder_bp, url_prefix='/bidder')      # /bidder/welcome, /bidder/credit_cards, etc.
+app.register_blueprint(bidder_bp, url_prefix='/bidder')      # /bidder/welcome, /bidder/watchlist, etc.
 app.register_blueprint(seller_bp, url_prefix='/seller')      # /seller/welcome, /seller/dashboard, etc.
 app.register_blueprint(helpdesk_bp, url_prefix='/helpdesk')  # /helpdesk/welcome, /helpdesk/queue, etc.
+app.register_blueprint(notifications_bp, url_prefix='/notifications')  # shared notifications UI for all roles
 
 @app.route('/')
 def index():
@@ -46,7 +48,7 @@ def index():
         return redirect(url_for('auth.login'))
     if 'helpdesk' in session['roles']:                                                                                                                       
         return redirect(url_for('helpdesk.welcome'))
-    elif 'seller' in session['roles']:                                                                                                                       
+    elif 'seller' in session['roles']:
         return redirect(url_for('seller.dashboard'))
     else:                                                                                                                                                    
         return redirect(url_for('bidder.welcome'))

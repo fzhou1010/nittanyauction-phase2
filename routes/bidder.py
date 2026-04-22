@@ -14,11 +14,6 @@ def require_login():
 def welcome():
     return render_template('bidder/welcome.html')
 
-@bidder_bp.route('/credit_cards')
-def credit_cards():
-    # TODO: list/add/remove credit cards
-    return render_template('bidder/credit_cards.html')
-
 @bidder_bp.route('/watchlist')
 def watchlist():
     # TODO: list/add/remove watchlist entries
@@ -76,12 +71,15 @@ def cart_add():
         return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
 
     listing = query_db(
-        'SELECT 1 FROM Auction_Listings WHERE Seller_Email = ? AND Listing_ID = ?',
+        'SELECT Status FROM Auction_Listings WHERE Seller_Email = ? AND Listing_ID = ?',
         [seller_email, listing_id], one=True,
     )
     if not listing:
         flash('Listing not found.')
         return redirect(url_for('listings.browse'))
+    if listing['Status'] != 1:
+        flash('This auction has ended and can no longer be added to your cart.')
+        return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
 
     db = get_db()
     db.execute(
@@ -89,7 +87,6 @@ def cart_add():
         [session['email'], seller_email, listing_id],
     )
     db.commit()
-    flash('Added to shopping cart.')
     return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
 
 @bidder_bp.route('/cart/remove', methods=['POST'])
@@ -106,7 +103,6 @@ def cart_remove():
         [session['email'], seller_email, listing_id],
     )
     db.commit()
-    flash('Removed from shopping cart.')
 
     return redirect(request.form.get('next') or url_for('bidder.shopping_cart'))
 
@@ -176,32 +172,6 @@ def auction_history():
         })
 
     return render_template('bidder/auction_history.html', won=won, bids=bid_rows)
-
-@bidder_bp.route('/notifications')
-def notifications():
-    rows = query_db(
-        'SELECT notification_id, notif_type, message, seller_email, listing_id, is_read, created_at '
-        'FROM Notifications WHERE recipient_email = ? ORDER BY created_at DESC',
-        [session['email']],
-    )
-    return render_template('bidder/notifications.html', notifications=rows)
-
-@bidder_bp.route('/notifications/mark_read', methods=['POST'])
-def notifications_mark_read():
-    notification_id = request.form.get('notification_id', '').strip()
-    db = get_db()
-    if notification_id:
-        db.execute(
-            'UPDATE Notifications SET is_read = 1 WHERE notification_id = ? AND recipient_email = ?',
-            [notification_id, session['email']],
-        )
-    else:
-        db.execute(
-            'UPDATE Notifications SET is_read = 1 WHERE recipient_email = ? AND is_read = 0',
-            [session['email']],
-        )
-    db.commit()
-    return redirect(request.form.get('next') or url_for('bidder.notifications'))
 
 @bidder_bp.route('/rate/<seller_email>', methods=['GET', 'POST'])
 def rate_seller(seller_email):

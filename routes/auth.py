@@ -5,7 +5,7 @@ import sqlite3 as sql
 import uuid # use uuid for generating an hex id for the address
 import hashlib
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
-from db import get_db, query_db, format_request_desc, HELPDESK_TEAM_EMAIL
+from db import get_db, query_db
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -197,7 +197,7 @@ def register_form(role):
                 session['roles'] = user_roles
                 session['role'] = 'seller'
                 session['available_roles'] = user_roles
-                return redirect(url_for('seller.welcome'))
+                return redirect(url_for('seller.dashboard'))
             except sql.IntegrityError:
                 flash('Error saving information into the database.')
                 return render_template('auth/register_form.html', role=role)
@@ -231,14 +231,13 @@ def register_form(role):
                 session['roles'] = user_roles
                 session['role'] = 'seller'
                 session['available_roles'] = user_roles
-                return redirect(url_for('seller.welcome')) #Todo: Make a local vendor welcome page, or should it be the same as the seller page
+                return redirect(url_for('seller.dashboard'))
             except sql.IntegrityError:
                 flash('Error saving information into the database.')
                 return render_template('auth/register_form.html', role=role)
-            except Exception as e:                                                                                                    
+            except Exception as e:
                 flash(f'Error saving information: {e}')
                 return render_template('auth/register_form.html', role=role)
-            
             
 
 
@@ -319,7 +318,7 @@ def profile():
             security_code = request.form.get('security_code')
 
             db.execute('''
-                INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email)
+                INSERT INTO Credit_Cards (credit_card_num, card_type, expire_month, expire_year, security_code, Owner_email) 
                 VALUES (?, ?, ?, ?, ?, ?)''',
                 [credit_card_num, card_type, expire_month, expire_year, security_code, user_email])
             db.commit()
@@ -358,8 +357,9 @@ def changeID():
     if not new_email:
         flash('Please provide a new email address.', 'danger')
         return redirect(url_for('auth.profile'))
+    
+    unassigned_staff = 'helpdeskteam@lsu.edu'
 
-    desc = format_request_desc(**{'NEW EMAIL': new_email, 'REASON': request_desc})
     db = get_db()
     db.execute('''
         INSERT INTO Requests (sender_email, helpdesk_staff_email, request_type, request_desc, request_status)
@@ -385,12 +385,11 @@ def promote():
     
     unassigned_staff = 'helpdeskteam@lsu.edu'
     
-    request_desc = f"ROUTING:{routing_number} | ACCOUNT:{account_number}"
     db = get_db()
 
     db.execute('''
         INSERT INTO Requests (sender_email, helpdesk_staff_email, request_type, request_desc, request_status)
-        VALUES (?, ?, ?, ?, ?)''', [user_email, unassigned_staff, 'BecomeSeller', request_desc , 0])
+        VALUES (?, ?, ?, ?, ?)''', [user_email, unassigned_staff, 'BecomeSeller', f"ROUTING:{routing_number} | ACCOUNT:{account_number}" , 0])
     db.commit()
 
     flash('Your request has been submitted. A HelpDesk staff member will review your request.', 'success')
