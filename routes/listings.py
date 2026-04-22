@@ -215,11 +215,12 @@ def detail(seller_email, listing_id):
     bid_count = len(bids)
     remaining_bids = listing['Max_bids'] - bid_count if listing['Max_bids'] else 0
 
-    # Mirror place_bid's min-bid logic so the form input matches server-side validation.
+    # Reserve price is a seller's sale threshold, not a bid floor — bidders
+    # can open at any positive amount and just need to outbid the current highest.
     if bids:
         min_bid = int(bids[0]['Bid_Price']) + 1
     else:
-        min_bid = max(1, int(listing['Reserve_Price'] or 0))
+        min_bid = 1
 
     if listing['Status'] == 2 and bids:
         winner_email = bids[0]['Bidder_Email']  # bids ordered DESC by price
@@ -305,9 +306,11 @@ def place_bid(seller_email, listing_id):
         flash('You cannot place consecutive bids — wait for another bidder first.', 'danger')
         return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
 
-    # if there are no bids yet, the minimum required bid is the reserve price (or 0 if no reserve). Otherwise, it must be at least $1 higher than the current highest bid.
+    # Reserve price is the seller's sale threshold (checked at auction close), not
+    # a bid floor. Any positive bid is allowed for the first bid; subsequent bids
+    # must exceed the current highest by at least $1.
     if current_bids['highest_bid'] is None:
-        min_required = auction['Reserve_Price'] or 0.0
+        min_required = 1.00
     else:
         min_required = current_bids['highest_bid'] + 1.00
 

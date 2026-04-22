@@ -8,8 +8,8 @@
             <div class="text-muted text-truncate" style="font-size: 0.75rem;">{{ item.Seller_Email }}</div>
             <div class="text-muted" style="font-size: 0.75rem;">Qty: {{ item.Quantity }}</div>
             <div class="mt-2 mb-2">
-                {% if item.current_bid %}
-                <span class="fw-semibold">${{ item.Current_Bid }}0</span>
+                {% if item.Current_Bid %}
+                <span class="fw-semibold">${{ item.Current_Bid }}</span>
                 {% else %}
                 <span class="text-muted">No bids yet</span>
                 {% endif %}
