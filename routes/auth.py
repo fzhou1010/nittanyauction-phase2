@@ -325,6 +325,23 @@ def profile():
             db.commit()
             flash('Card added successfully!', 'success')
 
+        elif form_type == 'remove_card':
+            # BR-22: scope the DELETE to the session owner so a crafted form
+            # cannot remove another bidder's card.
+            card_num = request.form.get('credit_card_num', '').strip()
+            if not card_num:
+                flash('Missing card reference.', 'danger')
+            else:
+                cur = db.execute(
+                    'DELETE FROM Credit_Cards WHERE credit_card_num = ? AND Owner_email = ?',
+                    [card_num, user_email],
+                )
+                db.commit()
+                if cur.rowcount:
+                    flash('Card removed.', 'success')
+                else:
+                    flash('Card not found.', 'danger')
+
         return redirect(url_for('auth.profile'))
 
     return render_template('auth/profile.html', user=user_info, address=address_info, cards=cards)
@@ -373,7 +390,7 @@ def promote():
 
     db.execute('''
         INSERT INTO Requests (sender_email, helpdesk_staff_email, request_type, request_desc, request_status)
-        VALUES (?, ?, ?, ?, ?)''', [user_email, unassigned_staff, 'BecomeSeller', "ROUTING:{routing_number} | ACCOUNT:{account_number}" , 0])
+        VALUES (?, ?, ?, ?, ?)''', [user_email, unassigned_staff, 'BecomeSeller', f"ROUTING:{routing_number} | ACCOUNT:{account_number}" , 0])
     db.commit()
 
     flash('Your request has been submitted. A HelpDesk staff member will review your request.', 'success')
