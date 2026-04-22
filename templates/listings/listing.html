@@ -8,7 +8,7 @@
         {% endif %}
         <div class="card-body p-2 d-flex flex-column" style="font-size: 0.85rem;">
             <div class="text-muted text-truncate" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em;">{{ item.Category or '—' }}</div>
-            <div class="fw-semibold text-truncate" style="font-size: 0.95rem;" title="{{ item.Auction_Title }}">{{ item.Auction_Title or 'Untitled' }}</div>
+            <div class="fw-semibold" style="font-size: 0.95rem; line-height: 1.2; min-height: 2.4em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="{{ item.Auction_Title }}">{{ item.Auction_Title or 'Untitled' }}</div>
             <div class="text-muted text-truncate">{{ item.Product_Name or '—' }}</div>
             <div class="text-muted text-truncate" style="font-size: 0.75rem;">{{ item.Seller_Email }}</div>
             <div class="text-muted" style="font-size: 0.75rem;">Qty: {{ item.Quantity }}</div>
