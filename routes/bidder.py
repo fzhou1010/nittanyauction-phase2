@@ -92,7 +92,6 @@ def cart_add():
         [session['email'], seller_email, listing_id],
     )
     db.commit()
-    flash('Added to shopping cart.')
     return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
 
 @bidder_bp.route('/cart/remove', methods=['POST'])
@@ -109,7 +108,6 @@ def cart_remove():
         [session['email'], seller_email, listing_id],
     )
     db.commit()
-    flash('Removed from shopping cart.')
 
     return redirect(request.form.get('next') or url_for('bidder.shopping_cart'))
 

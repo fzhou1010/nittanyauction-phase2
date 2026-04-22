@@ -17,36 +17,61 @@
 
 <div class="row">
     <!-- Listing Details -->
-    <div class="col-lg-8"> 
-        <div class="card mb-3">
+    <div class="col-lg-8 d-flex">
+        <div class="card mb-3 w-100">
             <div class="card-body">
-                <h1>{{ listing.Auction_Title }}</h1>
+                <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+                    <h1 class="mb-0">{{ listing.Auction_Title }}</h1>
+                    {% if session.get('email') != listing.Seller_Email %}
+                        {% if in_cart %}
+                        <form action="{{ url_for('bidder.cart_remove') }}" method="post" class="flex-shrink-0">
+                            <input type="hidden" name="seller_email" value="{{ listing.Seller_Email }}">
+                            <input type="hidden" name="listing_id" value="{{ listing.Listing_ID }}">
+                            <input type="hidden" name="next" value="{{ url_for('listings.detail', seller_email=listing.Seller_Email, listing_id=listing.Listing_ID) }}">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                <i class="bi bi-cart-dash me-1"></i>Remove from Cart
+                            </button>
+                        </form>
+                        {% elif listing.Status == 1 %}
+                        <form action="{{ url_for('bidder.cart_add') }}" method="post" class="flex-shrink-0">
+                            <input type="hidden" name="seller_email" value="{{ listing.Seller_Email }}">
+                            <input type="hidden" name="listing_id" value="{{ listing.Listing_ID }}">
+                            <button type="submit" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-cart-plus me-1"></i>Add to Cart
+                            </button>
+                        </form>
+                        {% endif %}
+                    {% endif %}
+                </div>
                 <p class="text-muted">
                     By {{ listing.Seller_Email }}
                     {% if avg_rating.Avg_Rating %}
-                        {% set rounded = avg_rating.Avg_Rating|round(0, 'common')|int %}
+                        {% set rating = avg_rating.Avg_Rating %}
                         <span class="text-nowrap ms-2">
                             {% for i in range(5) %}
-                                {% if i < rounded %}
+                                {% if i + 1 <= rating %}
                                     <i class="bi bi-star-fill text-warning"></i>
+                                {% elif i + 0.5 <= rating %}
+                                    <i class="bi bi-star-half text-warning"></i>
                                 {% else %}
                                     <i class="bi bi-star text-warning"></i>
                                 {% endif %}
                             {% endfor %}
+                            <small class="ms-1">({{ reviews|length }})</small>
                         </span>
                     {% endif %}
                 </p>
                 <p>{{ listing.Product_Description or 'No description.' }}</p>
                 <p><strong>Category:</strong> {{ listing.Category }}</p>
-                <p><strong>Product:</strong> {{ listing.Product_Name }}</p>
+                <p class="mb-0"><strong>Product:</strong> {{ listing.Product_Name }}</p>
             </div>
         </div>
     </div>
     
     <!-- Bid section -->
-    <div class="col-lg-4">
-        <div class="card mb-3">
-            <div class="card-body">
+    <div class="col-lg-4 d-flex">
+        <div class="card mb-3 w-100">
+            <div class="card-body d-flex flex-column justify-content-center">
                 {% if listing.Status == 2 %}
                     {# ── Auction sold ── #}
                     <div class="alert alert-success mb-3">
@@ -71,13 +96,19 @@
 
                 {% else %}
                     {# ── Active auction ── #}
-                    <h5 class="text-center">Current Highest Bid</h5>
+                    {% set is_top_bidder = bids and bids[0].Bidder_Email == session.get('email') %}
+                    <h2 class="h4 mb-3 text-center">Current Highest Bid</h2>
                     {% if bids %}
-                    <p class="h4 text-center">${{ bids[0].Bid_Price }}</p>
+                    <p class="h4 text-center mb-1 {% if is_top_bidder %}text-success{% endif %}">${{ bids[0].Bid_Price }}</p>
                     {% else %}
-                    <p class="h4 text-center">No bids yet</p>
+                    <p class="h4 text-center mb-1">No bids yet</p>
                     {% endif %}
-                    <p class="text-muted text-center">{{ remaining_bids }} bid{{ 's' if remaining_bids != 1 }} remaining</p>
+                    {% if is_top_bidder %}
+                    <p class="text-center small mb-1">
+                        <span class="badge bg-success-subtle text-success border border-success-subtle">Your bid is leading</span>
+                    </p>
+                    {% endif %}
+                    <p class="text-muted text-center small mb-3">{{ remaining_bids }} bid{{ 's' if remaining_bids != 1 }} remaining</p>
 
                     {% if session.get('email') != listing.Seller_Email %}
                     <form action="{{ url_for('listings.place_bid', seller_email=listing.Seller_Email, listing_id=listing.Listing_ID) }}" method="post">
@@ -91,25 +122,6 @@
                     </form>
                     {% else %}
                     <p class="text-muted fst-italic">You cannot bid on your own listing.</p>
-                    {% endif %}
-                {% endif %}
-
-                {% if session.get('email') != listing.Seller_Email %}
-                    {% if in_cart %}
-                    <hr>
-                    <form action="{{ url_for('bidder.cart_remove') }}" method="post">
-                        <input type="hidden" name="seller_email" value="{{ listing.Seller_Email }}">
-                        <input type="hidden" name="listing_id" value="{{ listing.Listing_ID }}">
-                        <input type="hidden" name="next" value="{{ url_for('listings.detail', seller_email=listing.Seller_Email, listing_id=listing.Listing_ID) }}">
-                        <button type="submit" class="btn btn-outline-secondary w-100 btn-sm">Remove from Shopping Cart</button>
-                    </form>
-                    {% elif listing.Status == 1 %}
-                    <hr>
-                    <form action="{{ url_for('bidder.cart_add') }}" method="post">
-                        <input type="hidden" name="seller_email" value="{{ listing.Seller_Email }}">
-                        <input type="hidden" name="listing_id" value="{{ listing.Listing_ID }}">
-                        <button type="submit" class="btn btn-outline-primary w-100 btn-sm">Add to Shopping Cart</button>
-                    </form>
                     {% endif %}
                 {% endif %}
             </div>
@@ -171,8 +183,13 @@
                     </thead>
                     <tbody>
                         {% for bid in bids %}
-                        <tr>
-                            <td>{{ bid.Bidder_Email }}</td>
+                        <tr {% if bid.Bidder_Email == session.get('email') %}class="table-success"{% endif %}>
+                            <td>
+                                {{ bid.Bidder_Email }}
+                                {% if bid.Bidder_Email == session.get('email') %}
+                                <span class="badge bg-success-subtle text-success ms-1">You</span>
+                                {% endif %}
+                            </td>
                             <td>${{ bid.Bid_Price }}</td>
                         </tr>
                         {% endfor %}

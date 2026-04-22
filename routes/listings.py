@@ -335,8 +335,7 @@ def place_bid(seller_email, listing_id):
             flash('Your bid was placed, but another bidder won the auction.', 'info')
     elif outcome and outcome['status'] == 'failed':
         flash('Auction ended — reserve price was not met.', 'warning')
-    else:
-        flash('Your bid has been placed.', 'success')
+    # For the open-auction case we let the updated bid card communicate the result.
     return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>/question', methods=['POST'])
