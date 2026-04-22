@@ -71,8 +71,8 @@
                         <div class="input-group mb-2">
                             <span class="input-group-text">$</span>
                             <input type="number" name="bid_amount" class="form-control" step="1"
-                                   min="{{ (bids[0].Bid_Price|int + 1) if bids else 1 }}" required
-                                   placeholder="Min ${{ (bids[0].Bid_Price|int + 1) if bids else 1 }}">
+                                   min="{{ min_bid }}" required
+                                   placeholder="Min ${{ min_bid }}">
                         </div>
                         <button type="submit" class="btn btn-primary w-100">Place Bid</button>
                     </form>

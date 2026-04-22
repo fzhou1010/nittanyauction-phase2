@@ -215,6 +215,12 @@ def detail(seller_email, listing_id):
     bid_count = len(bids)
     remaining_bids = listing['Max_bids'] - bid_count if listing['Max_bids'] else 0
 
+    # Mirror place_bid's min-bid logic so the form input matches server-side validation.
+    if bids:
+        min_bid = int(bids[0]['Bid_Price']) + 1
+    else:
+        min_bid = max(1, int(listing['Reserve_Price'] or 0))
+
     if listing['Status'] == 2 and bids:
         winner_email = bids[0]['Bidder_Email']  # bids ordered DESC by price
         txn = query_db(
@@ -242,7 +248,8 @@ def detail(seller_email, listing_id):
         'listings/detail.html',
         listing=listing, bids=bids, avg_rating = avg_rating, category_path=category_path,
         questions=questions, winner_email=winner_email, has_paid=has_paid,
-        remaining_bids=remaining_bids, in_cart=in_cart, reviews = reviews
+        remaining_bids=remaining_bids, in_cart=in_cart, reviews = reviews,
+        min_bid=min_bid,
     )
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>/bid', methods=['POST'])
