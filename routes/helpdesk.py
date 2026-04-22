@@ -150,6 +150,8 @@ def handle_request(rid):
         if error:
             flash(error)
             return redirect(url_for('helpdesk.queue'))
+        # reload req since changeid rewrites the sender email
+        req = query_db('SELECT * FROM Requests WHERE request_id = ?', [rid], one=True)
 
     db.execute(
         'UPDATE Requests SET request_status = 1, response_comment = ?, response_at = CURRENT_TIMESTAMP WHERE request_id = ?',
