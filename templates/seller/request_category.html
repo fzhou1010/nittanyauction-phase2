@@ -1,12 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Request New Category{% endblock %}
 {% block content %}
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{url_for('seller.dashboard')}}">Seller Dashboard</a></li>
+        <!-- should pass in the question id-->
+        <li class="breadcrumb-item active" aria-current="page">Request New Category</li>
+    </ol>
+</nav>
 <div class="row justify-content-center mt-4">
     <div class="col-md-8">
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title text-center my-3">Request a New Category</h3>
-                <p class="text-center">Please fill out the following form to request a new category!</p>
+                <p class="text-center text-muted">Please fill out the following form to request a new category!</p>
             </div>
             <!-- Request Form -->
             <div class="card-body">

@@ -189,9 +189,72 @@ def list_product_review():
 
     return render_template('seller/list_product/review.html', listing=listing)
 # Editing Listings
-@seller_bp.route('/edit_listing/<int:lid>')
+@seller_bp.route('/edit_listing/<int:lid>', methods=['GET', 'POST'])
 def edit_listing(lid): #should pass in the listing id
-    return render_template('seller/edit_listing')
+    email = session['email']
+
+    #get the current listing, should be seller email and listing id
+    cur_listing = query_db('''SELECT Listing_ID, Auction_Title, Product_Name, Product_Description, Category, Reserve_Price, Max_bids, Condition, Quantity, Status
+        FROM Auction_Listings
+        WHERE Seller_Email = ? AND Listing_ID = ?''', [email, lid], one=True) #should be one row
+
+    if not cur_listing:
+        flash('Listing not found.')
+        return redirect(url_for('seller.dashboard'))
+
+    # sold or inactive listings cannot be edited
+    if cur_listing['Status'] != 1:
+        flash('Only active listings can be edited.')
+        return redirect(url_for('seller.dashboard'))
+
+    # check if any bids have been placed. if so, editing the listing should be locked
+    bid_count = query_db('''SELECT COUNT(*) AS cnt FROM Bids
+                            WHERE Seller_Email = ? AND Listing_ID = ?''', [email, lid], one=True)
+    has_bids = bid_count['cnt'] > 0
+
+    if request.method == 'POST':
+        # if bids exist, block the update
+        if has_bids:
+            flash('This listing cannot be edited because bidding has already started.')
+            return redirect(url_for('seller.edit_listing', lid=lid))
+
+        # get the updated values from the form
+        auction_title = request.form.get('auction_title', '').strip()
+        product_name = request.form.get('product_name', '').strip()
+        product_description = request.form.get('product_description', '').strip()
+        condition = request.form.get('condition', '')
+        quantity = request.form.get('quantity', '1')
+        reserve_price = request.form.get('reserve_price')
+        max_bids = request.form.get('max_bids')
+
+        # validate required fields
+        if not auction_title or not product_name or not product_description:
+            flash('Please fill out all required fields.')
+            return render_template('seller/edit_listing.html', listing=cur_listing, has_bids=has_bids)
+
+        # validate numeric fields
+        try:
+            reserve = float(reserve_price)
+            max_b = int(max_bids)
+            if reserve <= 0 or max_b <= 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            flash('Reserve price and max bids must be positive numbers.')
+            return render_template('seller/edit_listing.html', listing=cur_listing, has_bids=has_bids)
+
+        # update the listing in the database with the values in form field
+        db = get_db()
+        db.execute('''UPDATE Auction_Listings
+                      SET Auction_Title = ?, Product_Name = ?, Product_Description = ?,
+                          Condition = ?, Quantity = ?, Reserve_Price = ?, Max_bids = ?
+                      WHERE Seller_Email = ? AND Listing_ID = ?''',
+                   [auction_title, product_name, product_description, condition,
+                    int(quantity), reserve, max_b, email, lid])
+        db.commit()
+        flash('Listing updated successfully!')
+        return redirect(url_for('seller.dashboard'))
+
+    return render_template('seller/edit_listing.html', listing=cur_listing, has_bids=has_bids)
 
 # Seller Questions
 @seller_bp.route('/questions')
@@ -226,8 +289,21 @@ def question(qid):
                             WHERE q.Seller_Email = l.Seller_Email AND q.Listing_ID = l.Listing_ID AND q.question_id = ? AND q.Seller_Email = ?''',
                           [qid, email], one=True) # returns one row of data per question
     #get the answer response from the form and save
-    
-    
+    if request.method == 'POST':
+        answer_text = request.form.get('answer_text', '').strip()
+        if not answer_text:
+            flash('Please provide an answer for the question')
+            return redirect(url_for('seller.question', qid=qid))
+        #update the answer text for the question
+        db = get_db()
+        db.execute('''UPDATE Questions SET answer_text = ?, answered = 1
+                    WHERE question_id = ? AND Seller_Email = ?
+                    ''', [answer_text, qid, email])
+        db.commit()
+        flash('Answer has been recorded successfully!')
+        #return to the same question page for the seller to view the entire log
+        return redirect(url_for('seller.question', qid=qid))
+        
     return render_template('seller/question.html', question=question)
 
 # Seller Category Request
