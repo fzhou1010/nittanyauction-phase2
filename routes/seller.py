@@ -13,7 +13,7 @@ def require_seller():
 
 @seller_bp.route('/welcome')
 def welcome():
-    return render_template('seller/dashboard.html')
+    return redirect(url_for('seller.dashboard'))
 
 @seller_bp.route('/dashboard')
 def dashboard():
@@ -55,7 +55,7 @@ def dashboard():
     #try and query for the transaction data per sold listing
     sold_listings_details = []
     for listing in sold_listings:
-        transaction_detail = query_db("""SELECT Buyer_Email, Payment, Date
+        transaction_detail = query_db("""SELECT Bidder_Email, Payment, Date
                                         FROM Transactions
                                       WHERE Seller_Email = ? AND Listing_ID = ?""", [email, listing['Listing_ID']], one=True) # we return this as one row
         #append the objects to sold listing details if they exist for the listing
@@ -65,10 +65,14 @@ def dashboard():
             'Product_Name': listing['Product_Name'],
             'Category': listing['Category'],
             # add the transaction details if found, otherwise return None for Jinja
-            'Buyer_Email': transaction_detail['Buyer_Email'] if transaction_detail else None, 
+            'Bidder_Email': transaction_detail['Bidder_Email'] if transaction_detail else None, 
             'Payment': transaction_detail['Payment'] if transaction_detail else None,
             'Date': transaction_detail['Date'] if transaction_detail else None
         })
+    #also need to query inactive or removed listings
+    inactive_listings = query_db("""SELECT Listing_ID, Auction_Title, Product_Name, Category, remaining_bids, reason_of_removal
+                                FROM Auction_Listings
+                                WHERE Seller_Email = ? AND Status = 0""", [email])
     # give the # of unanswered questions
     q_count = query_db('''SELECT COUNT (*) as q_count
                        FROM Questions
@@ -78,9 +82,8 @@ def dashboard():
                              FROM Rating
                              WHERE Seller_Email = ?''', [email], one=True)
     
-        
     return render_template('seller/dashboard.html', bal=bal, active_listings=active_listing_details, sold_listings=sold_listings_details,
-                           q_count=q_count, seller_rating=seller_rating)
+                           q_count=q_count, seller_rating=seller_rating, inactive_listings=inactive_listings)
 
 # Initial Step of Creating a Listing, Selecting a Category
 @seller_bp.route('/list_product', methods=['GET', 'POST'])
@@ -177,8 +180,7 @@ def list_product_review():
         db = get_db()
         db.execute('''
             INSERT INTO Auction_Listings
-                (Seller_Email, Listing_ID, Category, Auction_Title, Product_Name,
-                 Product_Description, Condition, Quantity, Reserve_Price, Max_bids, Status)
+                (Seller_Email, Listing_ID, Category, Auction_Title, Product_Name, Product_Description, Condition, Quantity, Reserve_Price, Max_bids, Status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         ''', [email, next_id, listing['category'], listing['auction_title'], listing['product_name'],
               listing['product_description'], listing['condition'], int(listing['quantity']), float(listing['reserve_price']), int(listing['max_bids'])])
@@ -190,37 +192,39 @@ def list_product_review():
         return redirect(url_for('seller.dashboard'))
 
     return render_template('seller/list_product/review.html', listing=listing)
+
 # Editing Listings
 @seller_bp.route('/edit_listing/<int:lid>', methods=['GET', 'POST'])
 def edit_listing(lid): #should pass in the listing id
     email = session['email']
-
+    #get the categories to pass in
+    categories = query_db('SELECT category_name FROM Categories ORDER BY category_name')
     #get the current listing, should be seller email and listing id
     cur_listing = query_db('''SELECT Listing_ID, Auction_Title, Product_Name, Product_Description, Category, Reserve_Price, Max_bids, Condition, Quantity, Status
         FROM Auction_Listings
         WHERE Seller_Email = ? AND Listing_ID = ?''', [email, lid], one=True) #should be one row
-
+    
+    #if the current listing is not found
     if not cur_listing:
-        flash('Listing not found.')
+        flash('There has been an error, listing not found')
         return redirect(url_for('seller.dashboard'))
 
     # sold or inactive listings cannot be edited
     if cur_listing['Status'] != 1:
-        flash('Only active listings can be edited.')
+        flash('Only active listings can be edited')
         return redirect(url_for('seller.dashboard'))
 
-    # check if any bids have been placed. if so, editing the listing should be locked
-    bid_count = query_db('''SELECT COUNT(*) AS cnt FROM Bids
-                            WHERE Seller_Email = ? AND Listing_ID = ?''', [email, lid], one=True)
-    has_bids = bid_count['cnt'] > 0
-
+    #we still want to check whether or listing being edited is allowed to be edited
+    bid_count = query_db('''SELECT COUNT(*) AS cnt FROM Bids                                                                       
+                          WHERE Seller_Email = ? AND Listing_ID = ?''', [email, lid], one=True)                              
+    if bid_count['cnt'] > 0:                                                                                                       
+        flash('This listing cannot be edited because bidding has started')                                                
+        return redirect(url_for('seller.dashboard'))
+    
     if request.method == 'POST':
-        # if bids exist, block the update
-        if has_bids:
-            flash('This listing cannot be edited because bidding has already started.')
-            return redirect(url_for('seller.edit_listing', lid=lid))
 
         # get the updated values from the form
+        category = request.form.get('category', '').strip()
         auction_title = request.form.get('auction_title', '').strip()
         product_name = request.form.get('product_name', '').strip()
         product_description = request.form.get('product_description', '').strip()
@@ -230,33 +234,69 @@ def edit_listing(lid): #should pass in the listing id
         max_bids = request.form.get('max_bids')
 
         # validate required fields
-        if not auction_title or not product_name or not product_description:
-            flash('Please fill out all required fields.')
-            return render_template('seller/edit_listing.html', listing=cur_listing, has_bids=has_bids)
+        if not auction_title or not product_name or not product_description or not condition or not quantity or not reserve_price or not max_bids:
+            flash('Please fill out all of the fields')
+            return render_template('seller/edit_listing.html', listing=cur_listing, categories=categories)
 
         # validate numeric fields
         try:
             reserve = float(reserve_price)
             max_b = int(max_bids)
-            if reserve <= 0 or max_b <= 0:
+            if reserve <= 0 or max_b <= 0: #ensure that the reserve price is more than 0 and that the truncated maximum bids is greater than as well
                 raise ValueError
         except (ValueError, TypeError):
-            flash('Reserve price and max bids must be positive numbers.')
-            return render_template('seller/edit_listing.html', listing=cur_listing, has_bids=has_bids)
+            flash('Reserve price and max bids must be positive numbers')
+            return render_template('seller/edit_listing.html', listing=cur_listing, categories=categories)
 
         # update the listing in the database with the values in form field
         db = get_db()
         db.execute('''UPDATE Auction_Listings
-                      SET Auction_Title = ?, Product_Name = ?, Product_Description = ?,
-                          Condition = ?, Quantity = ?, Reserve_Price = ?, Max_bids = ?
-                      WHERE Seller_Email = ? AND Listing_ID = ?''',
-                   [auction_title, product_name, product_description, condition,
-                    int(quantity), reserve, max_b, email, lid])
+                    SET Auction_Title = ?, Product_Name = ?, Product_Description = ?, Condition = ?, Category = ?, Quantity = ?, Reserve_Price = ?, Max_bids = ?
+                    WHERE Seller_Email = ? AND Listing_ID = ?''',
+                   [auction_title, product_name, product_description, condition, category, int(quantity), reserve, max_b, email, lid])
         db.commit()
         flash('Listing updated successfully!')
         return redirect(url_for('seller.dashboard'))
 
-    return render_template('seller/edit_listing.html', listing=cur_listing, has_bids=has_bids)
+    return render_template('seller/edit_listing.html', listing=cur_listing, categories=categories)
+
+# Remove Listings of the Seller, and record Reason
+@seller_bp.route('/remove_listing/<int:lid>', methods=['POST'])
+def remove_listing(lid):
+    email = session['email']
+
+    #get the max_bids and status of the listing to make sure it's active
+    cur_listing= query_db('''SELECT Auction_Title, Max_bids, Status
+                        FROM Auction_Listings
+                        WHERE Seller_Email = ? AND Listing_ID = ?''', [email, lid], one=True) #need to return as a row
+    
+    if not cur_listing:
+        flash('Listing not found')
+        return redirect(url_for('seller.dashboard'))
+
+    #if the listing is already sold or inactive
+    if cur_listing['Status'] != 1:
+        flash('Only active listings can be deleted')
+        return redirect(url_for('seller.dashboard'))
+    
+    if request.method == 'POST':
+        removal_reason = request.form.get('removal_reason', '').strip()
+        if not removal_reason: # if not reason is provided, then we can direct back to editing page
+            flash(f"Please provide a reason for the removal of the listing, {cur_listing['Auction_Title']}")
+            return redirect(url_for('seller.edit_listing', lid=lid))
+        
+        bid_count = query_db('''SELECT COUNT(*) AS cnt FROM Bids                                                           
+                            WHERE Seller_Email = ? AND Listing_ID = ?''', [email, lid], one=True)
+        remaining_bid_count = cur_listing['Max_bids'] - bid_count['cnt']
+        
+        #update the listing
+        db = get_db()
+        db.execute('''UPDATE Auction_Listings                                                                              
+                    SET Status = 0, remaining_bids = ?, reason_of_removal = ?                                            
+                    WHERE Seller_Email = ? AND Listing_ID = ?''',[remaining_bid_count, removal_reason, email, lid])
+        db.commit()
+        flash('The listing has been successfully removed from the Auction')
+        return redirect(url_for('seller.dashboard'))
 
 # Seller Questions
 @seller_bp.route('/questions')
@@ -264,12 +304,12 @@ def questions():
     email = session['email']
     #we want to query to get all of the active questiosn associated with the current seller
     active_questions = query_db('''SELECT q.question_id, q.Listing_Id, q.bidder_email, q.question_text, q.answer_text, q.answered, q.question_time, l.Auction_Title, l.Listing_ID
-        FROM Questions Q, Auction_Listings l 
-        WHERE l.Seller_Email = ? AND q.Listing_ID = l.Listing_ID AND q.answered = 0''', [email])
-    
+        FROM Questions Q, Auction_Listings l
+        WHERE l.Seller_Email = ? AND q.Seller_Email = l.Seller_Email AND q.Listing_ID = l.Listing_ID AND q.answered = 0''', [email])
+
     answered_questions = query_db('''SELECT q.question_id, q.Listing_Id, q.bidder_email, q.question_text, q.answer_text, q.answered, q.question_time, l.Auction_Title, l.Listing_ID
-        FROM Questions Q, Auction_Listings l 
-        WHERE l.Seller_Email = ? AND q.Listing_ID = l.Listing_ID AND q.answered = 1''', [email])
+        FROM Questions Q, Auction_Listings l
+        WHERE l.Seller_Email = ? AND q.Seller_Email = l.Seller_Email AND q.Listing_ID = l.Listing_ID AND q.answered = 1''', [email])
     
     uq_count = query_db('''SELECT COUNT (*) as q_count
                        FROM Questions
@@ -302,7 +342,7 @@ def question(qid):
                     WHERE question_id = ? AND Seller_Email = ?
                     ''', [answer_text, qid, email])
         db.commit()
-        flash('Answer has been recorded successfully!')
+        flash('Answer has been recorded')
         #return to the same question page for the seller to view the entire log
         return redirect(url_for('seller.question', qid=qid))
         

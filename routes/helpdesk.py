@@ -173,6 +173,22 @@ def _handle_add_category(db, req):
         if not parent_exists:
             return f'Parent category "{parent_category}" does not exist.'
 
+        ancestor = parent_category
+        for _ in range(100):
+            if ancestor is None or ancestor == 'Root':
+                break
+            if ancestor == category_name:
+                return f'Cannot add "{category_name}" under "{parent_category}": would create a cycle.'
+            row = query_db(
+                'SELECT parent_category FROM Categories WHERE category_name = ?',
+                [ancestor], one=True,
+            )
+            if not row:
+                break
+            ancestor = row['parent_category']
+        else:
+            return f'Cannot add "{category_name}" under "{parent_category}": existing category tree appears to contain a cycle.'
+
     db.execute(
         'INSERT INTO Categories (category_name, parent_category) VALUES (?, ?)',
         [category_name, parent_category],
@@ -208,7 +224,7 @@ def _handle_change_id(db, req):
         ('Bids', 'Seller_Email'),
         ('Auction_Listings', 'Seller_Email'),
         ('Transactions', 'Seller_Email'),
-        ('Transactions', 'Buyer_Email'),
+        ('Transactions', 'Bidder_Email'),
         ('Rating', 'Bidder_Email'),
         ('Rating', 'Seller_Email'),
         ('Questions', 'Bidder_Email'),
@@ -321,7 +337,7 @@ def _build_category_tree():
     )
     children = {}
     for row in rows:
-        parent = row['parent_category']
+        parent = row['parent_category'] or 'Root'
         children.setdefault(parent, []).append(row['category_name'])
     return children
 
@@ -399,7 +415,7 @@ def analytics():
     sales_under_30 = query_db(
         'SELECT COALESCE(SUM(t.Payment), 0) AS total '
         'FROM Transactions t '
-        'JOIN Bidders b ON b.email = t.Buyer_Email '
+        'JOIN Bidders b ON b.email = t.Bidder_Email '
         'WHERE b.age < 30',
         one=True,
     )
