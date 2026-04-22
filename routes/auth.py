@@ -223,7 +223,6 @@ def register_form(role):
                            [email, bank_routing_num, bank_account_num]) #we want the balance to be set to default in the schema, therefore we don't include a value here
                 db.execute('INSERT INTO Local_Vendors (email, business_name, business_address_id, customer_service_phone_number) VALUES (?, ?, ?, ?)', 
                            [email, business_name, address_id, cs_phone_num])
-                print(f'Commiting the local vendor with email: {email}')
                 db.commit()
                 print('commit successful')
                 session['email'] = email

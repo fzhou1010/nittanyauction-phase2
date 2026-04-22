@@ -99,12 +99,13 @@
                         <td class="text-center">
                             {% if listing['is_promoted'] %}
                                 <span class="badge bg-warning text-dark">
-                                    <i class="bi bi-star-fill me-1"></i>Featured
+                                    <i></i>Featured
                                 </span>
                             {% else %}
-                                <form action="{{ url_for('seller.promote_listing', listing_id=listing['Listing_ID']) }}" method="POST" class="d-inline">
+                                {% set fee = "%.2f"|format(listing['Reserve_Price'] * 0.05) %}
+                                <form action="{{ url_for('seller.promote_listing', listing_id=listing['Listing_ID']) }}" method="POST">
                                     <button type="submit" class="btn btn-sm btn-outline-warning text-nowrap"
-                                        onclick="return confirm('Promote this listing? A fee of 5% of the reserve price (${{ '%.2f'|format(listing['Reserve_Price'] * 0.05) }}) will be charged.')">
+                                        onclick="return confirm('Promote this listing? A fee of ${{ fee }} will be charged.')">
                                         <i class="bi bi-megaphone me-1"></i>Promote
                                     </button>
                                 </form>
