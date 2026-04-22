@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS Categories (
     -- ON DELETE defaults to NO ACTION so deleting a parent with children fails loudly instead of orphaning them.
     FOREIGN KEY (parent_category) REFERENCES Categories(category_name) ON UPDATE CASCADE
 );
-
+-- add condition - DONE
 CREATE TABLE IF NOT EXISTS Auction_Listings (
     Seller_Email TEXT NOT NULL,
     Listing_ID INTEGER NOT NULL,
@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS Auction_Listings (
     Auction_Title TEXT,
     Product_Name TEXT,
     Product_Description TEXT,
+    Condition TEXT,
     Quantity INTEGER DEFAULT 1,
     Reserve_Price REAL,
     Max_bids INTEGER,

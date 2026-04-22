@@ -41,7 +41,13 @@
                         </tr>
                         <tr>
                             <th>Condition</th>
-                            <td>${{ listing['condition'] }}</td>
+                            {% if listing['condition'] == 'new' %}
+                                <td>New</td>
+                            {%elif listing['condition'] == 'slightly-used' %}
+                                <td>Slightly Used</td>
+                            {% else %}
+                                <td>Used</td>
+                            {%endif%}
                         </tr>
                         <tr>
                             <th>Reserve Price</th>
