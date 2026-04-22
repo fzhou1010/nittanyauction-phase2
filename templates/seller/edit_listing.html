@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+<!--breadcrumb nav-->
+<nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{url_for('seller.dashboard')}}">Seller Dashboard</a></li>
+        <!-- should pass in the listing id-->
+        <li class="breadcrumb-item active" aria-current="page">Edit Listing #{{listing['Listing_ID']}}</li>
+    </ol>
+</nav>
+<!--Main editing Page-->
+<div class="row justify-content-center mt-3">
+    <div class="col-md-8">
+        <div class="col-md-12 mb-3">
+            <div class="card h-100 role-card">
+                <div class="card-header text-center">
+                    <h3 class="card-title fs-3 p-3"><strong>Currently Editing:</strong></h3>
+                    <p><strong>{{listing['Auction_Title']}}</strong></p>
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title mb-2">Update your listing</h5>
+                <p class="text-muted">Please update any fields neccessary</p>
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Auction Title</label>
+                        <input type="text" name="auction_title" class="form-control"
+                               value="{{ listing['Auction_Title'] }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Product Name</label>
+                        <input type="text" name="product_name" class="form-control"
+                               value="{{listing['Product_Name']}}"
+                               required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="product_description" class="form-control" rows="4">{{listing['Product_Description']}}</textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Condition</label>
+                            <select class="form-select" name="condition">
+                                {% if listing['Condition'] == 'new'%}
+                                    <option selected disabled>Current Condition: New</option>
+                                    <option value="new">New</option>
+                                    <option value="slightly-used">Slightly Used</option>
+                                    <option value="used">Used</option>
+                                {% elif listing['Condition'] == 'slightly-used'%}
+                                    <option selected disabled>Current Condition: Slightly Used</option>
+                                    <option value="new">New</option>
+                                    <option value="slightly-used">Slightly Used</option>
+                                    <option value="used">Used</option>
+                                {%else%}
+                                    <option selected disabled>Current Condition: Used</option>
+                                    <option value="new">New</option>
+                                    <option value="slightly-used">Slightly Used</option>
+                                    <option value="used">Used</option>
+                                {%endif%}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Quantity</label>
+                            <input type="number" name="quantity" class="form-control" min="1"
+                                value="{{ listing['Quantity']}}" required style="max-width: 150px;">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                        <label class="form-label">Reserve Price</label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number" name="reserve_price" class="form-control" min="0.01" step="any"
+                               value="{{ listing['Reserve_Price'] }}" required style="max-width: 200px;">
+                        </div>
+                        
+                        <div class="form-text">
+                            The minimum price you're willing to accept. <strong>This will be hidden from bidders.</strong>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Maximum Number of Bids</label>
+                        <input type="number" name="max_bids" class="form-control" min="1"
+                               value="{{ listing['Max_bids'] }}" required style="max-width: 200px;">
+                        <div class="form-text">
+                            The auction will end after this many bids are placed.
+                        </div>
+                    </div>
+                    </div>
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{{ url_for('seller.dashboard') }}" class="btn btn-outline-secondary">Back</a>
+                        <button type="submit" class="btn btn-primary">Update</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% endblock %}

@@ -4,6 +4,7 @@
 <div class="row justify-content-center mt-5">
     <div class="col-md-6 text-center mb-5">
         <h2 class="">Seller Dashboard</h2>
+        <small>Welcome back, <strong>{{session['email']}}</strong></small>
     </div>
     <!-- Hero Section : Quick Access to some Aggregate Data-->
     <div class="row col-md-8">
@@ -40,72 +41,119 @@
         </div>
     </div>
     <!-- Listing Dashboard -->
-    <div class="table-responsive mt-3">       
-        <table class="table table-hover align-middle">                                                        
-            <thead class="table-light">                                                                      
-                <tr>                                                                                          
-                    <th>Auction Title</th>                                                                    
-                    <th>Product</th>           
-                    <th>Category</th>                                                                         
-                    <th class="text-center">Bids</th>
-                    <th class="text-end">Highest Bid</th>                                                     
-                    <th class="text-end">Reserve</th>
-                    <th class= "text-center">Promoted</th>
-                    <th></th>                                                                                 
-                </tr>                          
-            </thead>                                                                                          
-            <tbody>                        
-                {% for listing in active_listings %}                                                          
-                <tr>                       
-                    <td>{{ listing['Auction_Title'] }}</td>                                                   
-                    <td>{{ listing['Product_Name'] }}</td>
-                    <td>{{ listing['Category'] }}</td>                
-                    <td class="text-center">{{ listing['bid_count'] }} / {{ listing['Max_bids'] }}</td>
-                    <td class="text-end">
-                        <!-- Should display the highest bid of the product, or no bid --> 
-                        {% if listing['highest_bid'] %}
-                            ${{ "%.2f"|format(listing['highest_bid']) }}                                      
-                        {% else %}         
-                            <span class="text-muted">No bids</span>                                           
-                        {% endif %}                                                                           
-                    </td>            
-                    <td class="text-end">${{ "%.2f"|format(listing['Reserve_Price']) }}</td>                  
-                    <td class="text-center">
-                        {% if listing['is_promoted'] %}
-                            <span class="badge bg-warning text-dark">
-                                <i></i>Featured
-                            </span>
+    <ul class="nav nav-tabs" role="tablist">
+        <li id="active_questions" class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#active_listings_table">
+                Active Listings
+            </button>
+        </li>
+        <li id="answered_questions" class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sold_listings_table">
+                Sold Listings
+            </button>
+        </li>
+    </ul>
+    <div class="tab-content mt-3">
+    <!--active listings table -->
+        <div class="tab-pane fade show active table-responsive mt-3" id="active_listings_table">       
+            <table class="table table-hover align-middle">                                                        
+                <thead class="table-light">                                                                      
+                    <tr>
+                        <th>Status</th>                                                                                          
+                        <th>Auction Title</th>                                                                    
+                        <th>Product</th>           
+                        <th>Category</th>                                                                         
+                        <th class="text-center">Bids</th>
+                        <th class="text-end">Highest Bid</th>                                                     
+                        <th class="text-end">Reserve</th>
+                        <th></th>                                                                                 
+                    </tr>                          
+                </thead>                                                                                          
+                <tbody>                        
+                    {% for listing in active_listings %}                                                          
+                    <tr>         
+                        <td><span class="badge bg-primary">Active</span></td>              
+                        <td>{{ listing['Auction_Title'] }}</td>                                                   
+                        <td>{{ listing['Product_Name'] }}</td>
+                        <td>{{ listing['Category'] }}</td>                
+                        <td class="text-center">{{ listing['bid_count'] }} / {{ listing['Max_bids'] }}</td>
+                        <td class="text-end">
+                            <!-- Should display the highest bid of the product, or no bid --> 
+                            {% if listing['highest_bid'] %}
+                                ${{ "%.2f"|format(listing['highest_bid']) }}                                      
+                            {% else %}         
+                                <span class="text-muted">No bids</span>                                           
+                            {% endif %}                                                                           
+                        </td>            
+                        <td class="text-end">${{ "%.2f"|format(listing['Reserve_Price']) }}</td>                  
+                        <td>                   
+                            <a href="{{ url_for('listings.detail', seller_email=session['email'], listing_id=listing['Listing_ID']) }}"                                                                     
+                                class="btn btn-sm btn-outline-primary">View</a>
+                        </td>                                                                                  
+                    </tr>                      
+                    {% else %}                 
+                    <tr>                                                                                          
+                        <td colspan="7" class="text-center text-muted py-4">
+                            No active listings yet.                                                               
+                            <a href="{{ url_for('seller.list_product') }}">List a product</a> to get started.
+                        </td>                                                                                     
+                    </tr>                          
+                    {% endfor %}    
+                    {% if active_listings %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted p-3">                                                             
+                            <a href="{{ url_for('seller.list_product') }}">List another product</a>
+                        </td>  
+                    </tr>
+                    {%endif%}                                                                        
+                </tbody>                      
+            </table>                                                                                              
+        </div>   
+        <!-- sold listings table --> 
+        <div class="tab-pane fade table-responsive mt-3" id="sold_listings_table">       
+            <table class="table table-hover align-middle">
+                <thead class="table-light">                                                                      
+                    <tr>
+                        <th>Status</th>                                                                                          
+                        <th>Auction Title</th>                                                                    
+                        <th>Product</th>           
+                        <th>Category</th>                                                                         
+                        <th>Buyer Email</th>
+                        <th>Payment</th>
+                        <th>Date</th>  
+                        <th></th>                                                                               
+                    </tr>                          
+                </thead>
+                <tbody>
+                    {% for listing in sold_listings %}
+                    <tr>
+                        <td><span class="badge text-danger">Sold</span></td>              
+                        <td>{{ listing['Auction_Title'] }}</td>                                                   
+                        <td>{{ listing['Product_Name'] }}</td>
+                        <td>{{ listing['Category'] }}</td>
+                        {% if listing['Buyer_Email']%}                         
+                            <td>{{listing['Buyer_Email']}}</td>
+                            <td>{{listing['Payment']}}</td>
+                            <td>{{listing['Date']}}</td>
                         {% else %}
-                            <form action="{{ url_for('seller.promote_listing', listing_id=listing['Listing_ID']) }}" method="POST">
-                                <button type="submit" class="btn btn-sm btn-outline-warning"
-                                    onclick="return confirm('Are you sure you want to promote this listing? A fee of 5% of the reserve price will be charged.')">
-                                    <i></i>Promote
-                                </button>
-                            </form>
-                        {% endif %}
-                    </td>   
-                    <td>                   
-                        <a href="{{ url_for('listings.detail', seller_email=session['email'], listing_id=listing['Listing_ID']) }}"                                                                     
-                            class="btn btn-sm btn-outline-primary">View</a>
-                    </td>
-                                                                                                   
-                </tr>
-                <tr>
-                    <td colspan="8" class="text-center text-muted p-3">                                                             
-                        <a href="{{ url_for('seller.list_product') }}">List another product</a>
-                    </td>  
-                </tr>                      
-                {% else %}                 
-                <tr>                                                                                          
-                    <td colspan="8" class="text-center text-muted py-4">
-                        No active listings yet.                                                               
-                        <a href="{{ url_for('seller.list_product') }}">List a product</a> to get started.
-                    </td>                                                                                     
-                </tr>                          
-                {% endfor %}                                                                                  
-            </tbody>                      
-        </table>                                                                                              
-    </div>    
+                            <td colspan="3" class="text-center text-muted py-4">
+                                Transaction Pending
+                            </td>
+                        {%endif%}
+                        <td>                   
+                            <a href="{{ url_for('listings.detail', seller_email=session['email'], listing_id=listing['Listing_ID']) }}"                                                                     
+                                class="btn btn-sm btn-outline-primary">View</a>
+                        </td>
+                    </tr>    
+                    {%else%}
+                    <tr>
+                        <td colspan="8" class="col-md-6 text-center text-muted p-3">There are no sold listings currently</td>                                                                          
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
 {% endblock %}

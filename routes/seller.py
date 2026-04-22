@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from db import get_db, query_db
 
 seller_bp = Blueprint('seller', __name__)
@@ -13,7 +13,7 @@ def require_seller():
 
 @seller_bp.route('/welcome')
 def welcome():
-    return redirect(url_for('seller.dashboard'))
+    return render_template('seller/dashboard.html')
 
 @seller_bp.route('/dashboard')
 def dashboard():
@@ -48,10 +48,27 @@ def dashboard():
         })
 
     #also want to retrieve sold listings for the specific seller, along with transaction status
-    sold_listings = query_db("""SELECT l.Auction_Title, l.Product_Name, t.Buyer_Email, t.Payment, t.Date
-                                FROM Auction_Listings l, Transactions t
-                                WHERE l.Seller_Email = t.Seller_Email AND l.Listing_ID = t.Listing_ID AND l.Seller_Email = ? AND l.Status = 2""", [email])
-
+    # since transactions aren't in the db unless a transaction is made after selling listing, it must be separated
+    sold_listings = query_db("""SELECT l.Listing_ID, l.Auction_Title, l.Product_Name, l.Category
+                                FROM Auction_Listings l
+                                WHERE l.Seller_Email = ? AND l.Status = 2""", [email])
+    #try and query for the transaction data per sold listing
+    sold_listings_details = []
+    for listing in sold_listings:
+        transaction_detail = query_db("""SELECT Buyer_Email, Payment, Date
+                                        FROM Transactions
+                                      WHERE Seller_Email = ? AND Listing_ID = ?""", [email, listing['Listing_ID']], one=True) # we return this as one row
+        #append the objects to sold listing details if they exist for the listing
+        sold_listings_details.append({
+            'Listing_ID': listing['Listing_ID'],
+            'Auction_Title': listing['Auction_Title'],                                                        
+            'Product_Name': listing['Product_Name'],
+            'Category': listing['Category'],
+            # add the transaction details if found, otherwise return None for Jinja
+            'Buyer_Email': transaction_detail['Buyer_Email'] if transaction_detail else None, 
+            'Payment': transaction_detail['Payment'] if transaction_detail else None,
+            'Date': transaction_detail['Date'] if transaction_detail else None
+        })
     # give the # of unanswered questions
     q_count = query_db('''SELECT COUNT (*) as q_count
                        FROM Questions
@@ -62,9 +79,10 @@ def dashboard():
                              WHERE Seller_Email = ?''', [email], one=True)
     
         
-    return render_template('seller/dashboard.html', bal=bal, active_listings=active_listing_details, sold_listings=sold_listings,
+    return render_template('seller/dashboard.html', bal=bal, active_listings=active_listing_details, sold_listings=sold_listings_details,
                            q_count=q_count, seller_rating=seller_rating)
 
+# Initial Step of Creating a Listing, Selecting a Category
 @seller_bp.route('/list_product', methods=['GET', 'POST'])
 def list_product():
     # render the category selection for listing a product
@@ -81,7 +99,7 @@ def list_product():
 
     return render_template('seller/list_product/category.html', categories=categories)
 
-
+# Details on the Listing
 @seller_bp.route('/list_product/details', methods=['GET', 'POST'])
 def list_product_details(): 
     #for the user to input product listing details
@@ -112,7 +130,7 @@ def list_product_details():
 
     return render_template('seller/list_product/product_details.html', listing=session['cur_listing'])
 
-
+# Update Product Listing Price
 @seller_bp.route('/list_product/pricing', methods=['GET', 'POST'])
 def list_product_pricing(): # for the product reserve price and auction termination parameters
     #check if the listing is in the session
@@ -138,19 +156,18 @@ def list_product_pricing(): # for the product reserve price and auction terminat
 
     return render_template('seller/list_product/pricing.html', listing=session['cur_listing'])
 
-
+# Review the listing before posting in case anything is wrong
 @seller_bp.route('/list_product/review', methods=['GET', 'POST'])
 def list_product_review():
-    # Step 4: Review and submit
+    #if the listing is not in the session or if the previous reserve price was not saved
     if 'cur_listing' not in session or 'reserve_price' not in session['cur_listing']:
         return redirect(url_for('seller.list_product'))
 
     listing = session['cur_listing']
-
-    if request.method == 'POST':
+    if request.method == 'POST': 
         email = session['email']
 
-        # Get next Listing_ID for this seller (per-seller, not global)
+        #we want to get the maximum auction id for this user, so we can increment it for this upcoming listing
         max_id = query_db(
             'SELECT MAX(Listing_ID) AS max_id FROM Auction_Listings WHERE Seller_Email = ?',
             [email], one=True
@@ -158,15 +175,13 @@ def list_product_review():
         next_id = (max_id['max_id'] or 0) + 1
 
         db = get_db()
-        #fix: need to add the condition of the product
         db.execute('''
             INSERT INTO Auction_Listings
                 (Seller_Email, Listing_ID, Category, Auction_Title, Product_Name,
-                 Product_Description, Quantity, Reserve_Price, Max_bids, Status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                 Product_Description, Condition, Quantity, Reserve_Price, Max_bids, Status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         ''', [email, next_id, listing['category'], listing['auction_title'], listing['product_name'],
-              listing['product_description'], int(listing['quantity']),
-              float(listing['reserve_price']), int(listing['max_bids'])])
+              listing['product_description'], listing['condition'], int(listing['quantity']), float(listing['reserve_price']), int(listing['max_bids'])])
         db.commit()
 
         # after saving all of the data to the database, we can get rid of the listing from the current sessions
@@ -175,11 +190,78 @@ def list_product_review():
         return redirect(url_for('seller.dashboard'))
 
     return render_template('seller/list_product/review.html', listing=listing)
+# Editing Listings
+@seller_bp.route('/edit_listing/<int:lid>', methods=['GET', 'POST'])
+def edit_listing(lid): #should pass in the listing id
+    email = session['email']
 
+    #get the current listing, should be seller email and listing id
+    cur_listing = query_db('''SELECT Listing_ID, Auction_Title, Product_Name, Product_Description, Category, Reserve_Price, Max_bids, Condition, Quantity, Status
+        FROM Auction_Listings
+        WHERE Seller_Email = ? AND Listing_ID = ?''', [email, lid], one=True) #should be one row
+
+    if not cur_listing:
+        flash('Listing not found.')
+        return redirect(url_for('seller.dashboard'))
+
+    # sold or inactive listings cannot be edited
+    if cur_listing['Status'] != 1:
+        flash('Only active listings can be edited.')
+        return redirect(url_for('seller.dashboard'))
+
+    # check if any bids have been placed. if so, editing the listing should be locked
+    bid_count = query_db('''SELECT COUNT(*) AS cnt FROM Bids
+                            WHERE Seller_Email = ? AND Listing_ID = ?''', [email, lid], one=True)
+    has_bids = bid_count['cnt'] > 0
+
+    if request.method == 'POST':
+        # if bids exist, block the update
+        if has_bids:
+            flash('This listing cannot be edited because bidding has already started.')
+            return redirect(url_for('seller.edit_listing', lid=lid))
+
+        # get the updated values from the form
+        auction_title = request.form.get('auction_title', '').strip()
+        product_name = request.form.get('product_name', '').strip()
+        product_description = request.form.get('product_description', '').strip()
+        condition = request.form.get('condition', '')
+        quantity = request.form.get('quantity', '1')
+        reserve_price = request.form.get('reserve_price')
+        max_bids = request.form.get('max_bids')
+
+        # validate required fields
+        if not auction_title or not product_name or not product_description:
+            flash('Please fill out all required fields.')
+            return render_template('seller/edit_listing.html', listing=cur_listing, has_bids=has_bids)
+
+        # validate numeric fields
+        try:
+            reserve = float(reserve_price)
+            max_b = int(max_bids)
+            if reserve <= 0 or max_b <= 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            flash('Reserve price and max bids must be positive numbers.')
+            return render_template('seller/edit_listing.html', listing=cur_listing, has_bids=has_bids)
+
+        # update the listing in the database with the values in form field
+        db = get_db()
+        db.execute('''UPDATE Auction_Listings
+                      SET Auction_Title = ?, Product_Name = ?, Product_Description = ?,
+                          Condition = ?, Quantity = ?, Reserve_Price = ?, Max_bids = ?
+                      WHERE Seller_Email = ? AND Listing_ID = ?''',
+                   [auction_title, product_name, product_description, condition,
+                    int(quantity), reserve, max_b, email, lid])
+        db.commit()
+        flash('Listing updated successfully!')
+        return redirect(url_for('seller.dashboard'))
+
+    return render_template('seller/edit_listing.html', listing=cur_listing, has_bids=has_bids)
+
+# Seller Questions
 @seller_bp.route('/questions')
 def questions():
     email = session['email']
-    #TODO: MAKE SURE TO ADD QUESTION TITLE
     #we want to query to get all of the active questiosn associated with the current seller
     active_questions = query_db('''SELECT q.question_id, q.Listing_Id, q.bidder_email, q.question_text, q.answer_text, q.answered, q.question_time, l.Auction_Title, l.Listing_ID
         FROM Questions Q, Auction_Listings l 
@@ -200,25 +282,107 @@ def questions():
     
     return render_template('seller/questions.html', active_questions=active_questions, answered_questions=answered_questions, uq_count=uq_count, aq_count = aq_count)
 
-@seller_bp.route('/question/<int:qid>') #for specific questions, which would including responding and viewing answers
+@seller_bp.route('/question/<int:qid>', methods=['GET','POST']) #for specific questions, which would including responding and viewing answers
 def question(qid):
-        # receiving the question answer from the seller regarding the listing
+    # receiving the question answer from the seller regarding the listing
     email = session['email']
+    question = query_db('''SELECT q.question_id, q.Listing_ID, q.Bidder_Email, q.question_text, q.answer_text, q.answered, q.question_time, l.Auction_Title
+                            FROM Questions q, Auction_Listings l                                           
+                            WHERE q.Seller_Email = l.Seller_Email AND q.Listing_ID = l.Listing_ID AND q.question_id = ? AND q.Seller_Email = ?''',
+                          [qid, email], one=True) # returns one row of data per question
+    #get the answer response from the form and save
     if request.method == 'POST':
-        return
-    
-    return render_template('seller/question.html', qid=qid)
+        answer_text = request.form.get('answer_text', '').strip()
+        if not answer_text:
+            flash('Please provide an answer for the question')
+            return redirect(url_for('seller.question', qid=qid))
+        #update the answer text for the question
+        db = get_db()
+        db.execute('''UPDATE Questions SET answer_text = ?, answered = 1
+                    WHERE question_id = ? AND Seller_Email = ?
+                    ''', [answer_text, qid, email])
+        db.commit()
+        flash('Answer has been recorded successfully!')
+        #return to the same question page for the seller to view the entire log
+        return redirect(url_for('seller.question', qid=qid))
+        
+    return render_template('seller/question.html', question=question)
 
-                 
-@seller_bp.route('/questions/<int:qid>/answer', methods=['POST'])
-def answer_question(qid):
-    # TODO: update question with answer
-    return redirect(url_for('seller.questions'))
-
+# Seller Category Request
 @seller_bp.route('/request_category', methods=['GET', 'POST'])
 def request_category():
-    # TODO: new category request -> Requests table
-    return render_template('seller/request_category.html')
+    email = session['email']
+
+    # since we want to maintain a hierarichal structure for the categories, we want a parent and a child category
+    if request.method == 'POST':
+        parent_category = request.form.get('parent_category', '').strip()
+        new_category = request.form.get('new_category', '').strip()
+        sub_category = request.form.get('sub_category', '').strip()
+
+
+        #if neither are there, then error
+        if not parent_category or not new_category:
+            flash('Please select a parent category and enter a new category name.')
+            return redirect(url_for('seller.request_category'))
+
+        # check if the category already exists in db
+        is_existing = query_db('SELECT * FROM Categories WHERE category_name = ?', [new_category], one=True)
+        if is_existing:
+            flash('A category with that name already exists')
+            return redirect(url_for('seller.request_category'))
+        
+        #if the user selected a sub-category as the parent
+        if sub_category != '':
+            # get the current request id to increment by one
+            cur_id = query_db('SELECT MAX(request_id) AS cur_id FROM Requests', one=True)
+            next_id = (cur_id['cur_id'] or 0) + 1
+             #create request ticket for helpdesk to process
+            req_desc = f"Please add a new category '{new_category}' under '{sub_category}'"
+            db = get_db()
+            db.execute('''INSERT INTO Requests (request_id, sender_email, helpdesk_staff_email, request_type, request_desc, request_status)
+                      VALUES (?, ?, ?, ?, ?, 0)''',
+                   [next_id, email, 'helpdeskteam@lsu.edu', 'AddCategory', req_desc])
+            db.commit()
+            flash('Category request submitted successfully!')
+            return redirect(url_for('seller.request_category'))
+
+        # get the current request id to increment by one
+        cur_id = query_db('SELECT MAX(request_id) AS cur_id FROM Requests', one=True)
+        next_id = (cur_id['cur_id'] or 0) + 1
+
+        #create request ticket for helpdesk to process
+        req_desc = f"Please add a new category '{new_category}' under '{parent_category}'"
+        db = get_db()
+        db.execute('''INSERT INTO Requests (request_id, sender_email, helpdesk_staff_email, request_type, request_desc, request_status)
+                      VALUES (?, ?, ?, ?, ?, 0)''',
+                   [next_id, email, 'helpdeskteam@lsu.edu', 'AddCategory', req_desc])
+        db.commit()
+        flash('Category request submitted successfully!')
+        return redirect(url_for('seller.request_category'))
+
+    #we want to first get all of the root categories, where parent category attribute = 'Root'
+    root_categories = query_db("SELECT category_name FROM Categories WHERE parent_category = 'Root' ORDER BY category_name")
+    #then we can query all of the categories as row items
+    all_categories = query_db("SELECT category_name, parent_category FROM Categories ORDER BY category_name")
+
+    category_hierarchy = {}
+    # for each row item in all of the categories
+    for cat in all_categories:
+        parent = cat['parent_category']
+        if parent not in category_hierarchy: # if the parent category is not already in the dictonary as a key, make a key
+            category_hierarchy[parent] = []
+        #if the parent is already in the dictionary, add the category to the parent category key
+        category_hierarchy[parent].append(cat['category_name'])
+
+    
+
+    # get this seller's past category requests to display the current status
+    my_requests = query_db('''SELECT request_id, request_desc, request_status
+                              FROM Requests
+                              WHERE sender_email = ? AND request_type = 'AddCategory'
+                              ORDER BY request_id DESC''', [email])
+
+    return render_template('seller/request_category.html', root_categories=root_categories, category_hierarchy=category_hierarchy, my_requests=my_requests)
 
 @seller_bp.route('/promote/<int:listing_id>', methods=['POST'])
 def promote_listing(listing_id):

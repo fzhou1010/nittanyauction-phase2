@@ -193,11 +193,8 @@ def register_form(role):
                            [email, bank_routing_num, bank_account_num]) #we want the balance to be set to default in the schema, therefore we don't include a value here
                 db.commit()
                 session['email'] = email
-                user_roles = get_user_roles(email)
-                session['roles'] = user_roles
-                session['role'] = 'seller'
-                session['available_roles'] = user_roles
-                return redirect(url_for('seller.welcome'))
+                session['roles'] = get_user_roles(email)
+                return redirect(url_for('seller.dashboard'))
             except sql.IntegrityError:
                 flash('Error saving information into the database.')
                 return render_template('auth/register_form.html', role=role)
@@ -227,18 +224,14 @@ def register_form(role):
                 db.commit()
                 print('commit successful')
                 session['email'] = email
-                user_roles = get_user_roles(email)
-                session['roles'] = user_roles
-                session['role'] = 'seller'
-                session['available_roles'] = user_roles
-                return redirect(url_for('seller.welcome')) #Todo: Make a local vendor welcome page, or should it be the same as the seller page
+                session['roles'] = get_user_roles(email)
+                return redirect(url_for('seller.dashboard')) 
             except sql.IntegrityError:
                 flash('Error saving information into the database.')
                 return render_template('auth/register_form.html', role=role)
-            except Exception as e:                                                                                                    
+            except Exception as e:
                 flash(f'Error saving information: {e}')
                 return render_template('auth/register_form.html', role=role)
-            
             
 
 
