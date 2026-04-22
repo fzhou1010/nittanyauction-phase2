@@ -32,9 +32,9 @@
                 {% endif %}
                 {% endmacro %}
 
-                {% if tree.get(None) %}
+                {% if tree.get('Root') %}
                 <ul class="list-unstyled">
-                    {% for root in tree[None] %}
+                    {% for root in tree['Root'] %}
                     <li class="mb-2">
                         <strong>{{ root }}</strong>
                         {{ render_tree(root) }}

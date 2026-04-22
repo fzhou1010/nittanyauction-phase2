@@ -4,12 +4,17 @@ from notifications import notify
 
 listings_bp = Blueprint('listings', __name__)
 
-def get_all_subcategories(category):
+def get_all_subcategories(category, visited=None):
     #Recursively get all subcategories of a given category
+    if visited is None:
+        visited = set()
+    if category in visited:
+        return []
+    visited.add(category)
     subcats = [category]
     children = query_db('SELECT category_name FROM Categories WHERE parent_category = ?', [category])
     for child in children:
-        subcats.extend(get_all_subcategories(child['category_name']))
+        subcats.extend(get_all_subcategories(child['category_name'], visited))
     return subcats
 
 

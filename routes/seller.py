@@ -13,7 +13,7 @@ def require_seller():
 
 @seller_bp.route('/welcome')
 def welcome():
-    return render_template('seller/dashboard.html')
+    return redirect(url_for('seller.dashboard'))
 
 @seller_bp.route('/dashboard')
 def dashboard():
@@ -304,12 +304,12 @@ def questions():
     email = session['email']
     #we want to query to get all of the active questiosn associated with the current seller
     active_questions = query_db('''SELECT q.question_id, q.Listing_Id, q.bidder_email, q.question_text, q.answer_text, q.answered, q.question_time, l.Auction_Title, l.Listing_ID
-        FROM Questions Q, Auction_Listings l 
-        WHERE l.Seller_Email = ? AND q.Listing_ID = l.Listing_ID AND q.answered = 0''', [email])
-    
+        FROM Questions Q, Auction_Listings l
+        WHERE l.Seller_Email = ? AND q.Seller_Email = l.Seller_Email AND q.Listing_ID = l.Listing_ID AND q.answered = 0''', [email])
+
     answered_questions = query_db('''SELECT q.question_id, q.Listing_Id, q.bidder_email, q.question_text, q.answer_text, q.answered, q.question_time, l.Auction_Title, l.Listing_ID
-        FROM Questions Q, Auction_Listings l 
-        WHERE l.Seller_Email = ? AND q.Listing_ID = l.Listing_ID AND q.answered = 1''', [email])
+        FROM Questions Q, Auction_Listings l
+        WHERE l.Seller_Email = ? AND q.Seller_Email = l.Seller_Email AND q.Listing_ID = l.Listing_ID AND q.answered = 1''', [email])
     
     uq_count = query_db('''SELECT COUNT (*) as q_count
                        FROM Questions
