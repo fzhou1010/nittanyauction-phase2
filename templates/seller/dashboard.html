@@ -163,7 +163,11 @@
                     <!-- add new status so we know whether its removed or has been canceled due to reserve price reasons -->
                     {% for listing in inactive_listings %}
                     <tr>
+                        {% if listing['Status'] == 0 %}
                         <td><span class="badge bg-warning text-danger">Removed</span></td>
+                        {%else%}
+                        <td><span class="badge bg-warning text-danger">Failed</span></td>
+                        {%endif%}
                         <td>
                             <a href="{{ url_for('listings.detail', seller_email=session['email'], listing_id=listing['Listing_ID']) }}" class="text-decoration-none hover-underline text-body">
                                 {{ listing['Auction_Title'] }}

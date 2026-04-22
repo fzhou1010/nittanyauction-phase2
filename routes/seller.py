@@ -72,9 +72,9 @@ def dashboard():
             'Date': transaction_detail['Date'] if transaction_detail else None
         })
     #also need to query inactive or removed listings
-    inactive_listings = query_db("""SELECT Listing_ID, Auction_Title, Product_Name, Category, remaining_bids, reason_of_removal
+    inactive_listings = query_db("""SELECT Listing_ID, Auction_Title, Product_Name, Category, remaining_bids, reason_of_removal, Status
                                 FROM Auction_Listings
-                                WHERE Seller_Email = ? AND Status = 0""", [email])
+                                WHERE Seller_Email = ? AND Status = 0 OR Status = 3""", [email])
     # give the # of unanswered questions
     q_count = query_db('''SELECT COUNT (*) as q_count
                        FROM Questions

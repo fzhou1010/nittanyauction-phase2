@@ -3,7 +3,7 @@ from db import get_db, query_db, format_request_desc, HELPDESK_TEAM_EMAIL
 
 bidder_bp = Blueprint('bidder', __name__)
 
-STATUS_LABELS = {1: 'Active', 0: 'Inactive', 2: 'Sold'}
+STATUS_LABELS = {1: 'Active', 0: 'Removed', 2: 'Sold', 3: 'Reserve Price Not Met'}
 
 @bidder_bp.before_request
 def require_login():
