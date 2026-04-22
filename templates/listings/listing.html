@@ -1,6 +1,11 @@
 {% macro render_listing(item) %}
 <div class="col-md-4 mt-5">
-    <div class="card">
+    <div class="card {% if item.is_promoted %}border-warning{% endif %}">
+        {% if item.is_promoted %}
+        <div class="card-header bg-warning text-dark py-1 small">
+            <i></i>Featured
+        </div>
+        {% endif %}
         <div class="card-body">
             <h6 class="card-subtitle mb-2 text-muted">{{ item.Category }}</h6>
             <h2 class="card-title">{{ item.Auction_Title }}</h2>
@@ -8,10 +13,10 @@
             <h6 class="card-subtitle mb-2 text-muted">Seller: {{ item.Seller_Email }}</h6>
             <h6 class="card-subtitle mb-2 text-muted">Qty: {{ item.Quantity }}</h6>
             <!-- TODO: Figure out pricing formatting with last 0-->
-            {% if item.current_bid %}
-            <p class="card-text">Current Bid: ${{ item.Current_Bid }}0</p>
+            {% if item.Current_Bid %}
+            <p class="card-text">Current Bid: ${{ "%.2f"|format(item.Current_Bid) }}</p>
             {% else %}
-            <p class="card-text">No Bids Yet</p>
+            <p class="card-text">Starting at</p>
             {% endif %}
             <a href="/listing/{{ item.Seller_Email }}/{{ item.Listing_ID }}" class="btn btn-primary">View Details</a>
         </div>
