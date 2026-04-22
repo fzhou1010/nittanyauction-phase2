@@ -11,8 +11,7 @@ app.teardown_appcontext(close_db)                # Auto-close the DB connection 
 
 @app.template_filter('displaydate')
 def displaydate(value):
-    """Normalize a Rating.Date value (either ISO 'YYYY-MM-DD' written by our code,
-    or legacy 'M/D/YY' from the seed CSV) to a consistent 'M/D/YY' for display."""
+    """Format a Rating.Date as 'M/D/YY'."""
     if value is None or value == '':
         return ''
     s = str(value).strip()

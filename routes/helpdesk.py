@@ -54,8 +54,7 @@ def queue():
         [staff_email],
     )
 
-    # Pre-parse the pipe-separated request_desc payload so the template can
-    # render a clean field-by-field view instead of raw text.
+    # parse request_desc so the template can show each field nicely
     my_requests = []
     for row in my_requests_rows:
         entry = dict(row)
@@ -225,7 +224,7 @@ def _handle_change_id(db, req):
     if taken:
         return f'Email "{new_email}" is already in use.'
 
-    # defer fk checks so we can rewrite users.email + child rows atomically
+    # pragma lets us update Users.email and the child tables in the same transaction
     db.execute('PRAGMA defer_foreign_keys = ON')
     db.execute('UPDATE Users SET email = ? WHERE email = ?', [new_email, old_email])
 
@@ -298,7 +297,7 @@ def _handle_pending_role(db, req):
     if requested_role not in ('bidder', 'seller'):
         return 'Invalid requested role on this application.'
 
-    # Guard: applicant might have been given a role in the meantime.
+    # applicant may have been given a role since they submitted
     if query_db('SELECT 1 FROM Bidders WHERE email = ?', [sender], one=True):
         return 'Applicant already has a role.'
 
@@ -313,7 +312,7 @@ def _handle_pending_role(db, req):
 
     if query_db('SELECT 1 FROM Credit_Cards WHERE credit_card_num = ?',
                 [parts['credit_card_num']], one=True):
-        return 'Cards cannot be shared across accounts — this card is already registered to another user.'
+        return 'Cards cannot be shared across accounts. This card is already registered to another user.'
 
     address_id = uuid.uuid4().hex
     db.execute(
@@ -410,7 +409,7 @@ def _build_category_tree():
     )
     children = {}
     for row in rows:
-        # skip the root row itself, otherwise the recursive template loops forever
+        # the Root row has NULL parent; if we kept it the tree renders Root under Root
         if row['category_name'] == 'Root':
             continue
         parent = row['parent_category'] or 'Root'

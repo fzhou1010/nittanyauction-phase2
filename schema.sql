@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS Categories (
     category_name TEXT,
     parent_category TEXT,
     PRIMARY KEY (category_name),
-    -- cascade renames to children; deleting a parent with children should fail
+    -- rename parents, don't let them be deleted while children exist
     FOREIGN KEY (parent_category) REFERENCES Categories(category_name) ON UPDATE CASCADE
 );
 -- add condition - DONE
@@ -111,7 +111,6 @@ CREATE TABLE IF NOT EXISTS Auction_Listings (
     Status INTEGER DEFAULT 1 CHECK(Status IN (0,1,2,3)),
     PRIMARY KEY (Seller_Email, Listing_ID),
     FOREIGN KEY (Seller_Email) REFERENCES Sellers(email),
-    -- keep listings in sync with category renames; don't let deletes wipe history
     FOREIGN KEY (Category) REFERENCES Categories(category_name) ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
@@ -150,7 +149,7 @@ CREATE TABLE IF NOT EXISTS Rating (
     FOREIGN KEY (Seller_Email, Listing_ID) REFERENCES Auction_Listings(Seller_Email, Listing_ID)
 );
 
--- one rating per auction; partial so legacy rows with null listing_id are fine
+-- one rating per (bidder, seller, listing); NULL Listing_ID rows are exempt
 CREATE UNIQUE INDEX IF NOT EXISTS idx_rating_unique_per_listing
     ON Rating(Bidder_Email, Seller_Email, Listing_ID)
     WHERE Listing_ID IS NOT NULL;
@@ -195,9 +194,7 @@ CREATE TABLE IF NOT EXISTS Shopping_Cart (
     FOREIGN KEY (Seller_Email, Listing_ID) REFERENCES Auction_Listings(Seller_Email, Listing_ID) ON DELETE CASCADE
 );
 
--- Per-seller rating aggregate. Used anywhere avg rating / rating count is displayed
--- (seller dashboard, listing detail, future browse cards) so the aggregate lives in
--- one place and all callers stay consistent.
+-- avg rating per seller
 CREATE VIEW IF NOT EXISTS Seller_Avg_Rating AS
 SELECT Seller_Email,
        AVG(Rating) AS Avg_Rating,
@@ -205,7 +202,7 @@ SELECT Seller_Email,
 FROM Rating
 GROUP BY Seller_Email;
 
--- per-listing bid stats so we just join instead of running subqueries everywhere
+-- bid count + highest bid per listing
 CREATE VIEW IF NOT EXISTS Listing_Bid_Stats AS
 SELECT Seller_Email,
        Listing_ID,
@@ -214,7 +211,7 @@ SELECT Seller_Email,
 FROM Bids
 GROUP BY Seller_Email, Listing_ID;
 
--- indexes for the hot queries (notifications, browse, dashboard, cart, ratings)
+-- indexes for common query patterns
 CREATE INDEX IF NOT EXISTS idx_notifications_recipient_unread ON Notifications(recipient_email, is_read);
 CREATE INDEX IF NOT EXISTS idx_bids_listing ON Bids(Seller_Email, Listing_ID);
 CREATE INDEX IF NOT EXISTS idx_listings_status_category ON Auction_Listings(Status, Category);

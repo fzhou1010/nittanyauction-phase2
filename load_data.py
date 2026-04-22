@@ -138,7 +138,7 @@ def main():
         [HELPDESK_TEAM_EMAIL, 'Unassigned Queue'],
     )
     db.commit()
-    print(f'  Seeded sentinel helpdesk account: {HELPDESK_TEAM_EMAIL}')
+    print(f'  Seeded helpdesk account: {HELPDESK_TEAM_EMAIL}')
 
     db.execute('PRAGMA foreign_keys = ON')  # Reenable FK enforcement for normal use
     db.close()

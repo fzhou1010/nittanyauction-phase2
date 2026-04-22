@@ -49,7 +49,7 @@ def _notify_auction_close(seller_email, listing_id, title, outcome, winner=None,
     else:  # failed
         for email in bidder_emails:
             notify(email, 'auction_failed',
-                   f'Auction ended for "{title}" — reserve price was not met.',
+                   f'Auction ended for "{title}": reserve price was not met.',
                    seller_email, listing_id)
         for email in cart_emails - bidder_emails:
             notify(email, 'cart_auction_ended',
@@ -58,11 +58,7 @@ def _notify_auction_close(seller_email, listing_id, title, outcome, winner=None,
 
 
 def check_auction_complete(seller_email, listing_id):
-    """Evaluate whether an auction has reached Max_bids and resolve it.
-
-    Returns a dict describing the outcome, or None if the auction is still active.
-    Side-effect: updates Auction_Listings.Status (2=sold, 0=failed) and emits notifications.
-    """
+    """Check if auction hit Max_bids and close it out. Returns outcome dict, or None if still active."""
     listing = query_db(
         'SELECT * FROM Auction_Listings WHERE Seller_Email = ? AND Listing_ID = ?',
         [seller_email, listing_id], one=True,
@@ -106,7 +102,7 @@ def check_auction_complete(seller_email, listing_id):
     db.commit()
     return {'status': 'failed'}
 
-ROOT_PARENT = 'Root'  # sentinel for top-level categories in Categories.parent_category
+ROOT_PARENT = 'Root'  # value used for top-level categories' parent_category
 
 
 @listings_bp.route('/browse')
@@ -201,7 +197,7 @@ def browse():
             current_category=category,
         )
 
-    # Hierarchy mode: dynamically fetch subcategories of the current node
+    # hierarchy mode: fetch subcategories of the current node
     parent_key = category if category else ROOT_PARENT
     subcategories = query_db(
         'SELECT category_name FROM Categories WHERE parent_category = ? ORDER BY category_name',
@@ -423,7 +419,7 @@ def place_bid(seller_email, listing_id):
         [seller_email, listing_id], one=True,
     )
     if last_bidder and last_bidder['Bidder_Email'] == user_email:
-        flash('You cannot place consecutive bids — wait for another bidder first.', 'danger')
+        flash('You cannot place consecutive bids. Wait for another bidder first.', 'danger')
         return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
 
     # first bid just needs to be positive, later ones must beat the highest by $1
@@ -452,8 +448,8 @@ def place_bid(seller_email, listing_id):
         else:
             flash('Your bid was placed, but another bidder won the auction.', 'info')
     elif outcome and outcome['status'] == 'failed':
-        flash('Auction ended — reserve price was not met.', 'warning')
-    # For the open-auction case we let the updated bid card communicate the result.
+        flash('Auction ended: reserve price was not met.', 'warning')
+    # if auction is still open, the bid card shows the result
     return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>/question', methods=['POST'])
@@ -546,7 +542,7 @@ def pay(seller_email, listing_id):
             db.commit()
             flash('Card added.', 'success')
         except sqlite3.IntegrityError:
-            flash('Cards cannot be shared across accounts — this card is already registered to another user.', 'danger')
+            flash('Cards cannot be shared across accounts. This card is already registered to another user.', 'danger')
         return redirect(url_for('listings.pay', seller_email=seller_email, listing_id=listing_id))
 
     selected_card = request.form.get('credit_card_num', '').strip()

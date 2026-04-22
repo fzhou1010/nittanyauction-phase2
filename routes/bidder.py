@@ -111,7 +111,7 @@ def cart_remove():
 def auction_history():
     email = session['email']
 
-    # won auctions + whether they already rated the seller
+    # already_rated hides the Rate button after a rating has been submitted
     won_rows = query_db(
         '''
         SELECT
@@ -148,7 +148,7 @@ def auction_history():
     for w in won:
         w['can_rate'] = bool(w['Payment']) and not w['already_rated']
 
-    # Bid history: one row per listing the bidder has touched, with their top bid vs the current leader.
+    # bid history: one row per listing, with the bidder's top bid and the current leader
     bids = query_db(
         '''
         SELECT
@@ -201,7 +201,7 @@ def rate_seller(seller_email, listing_id):
         flash('Listing not found.', 'danger')
         return redirect(url_for('bidder.auction_history'))
 
-    # need to have actually won + paid for this auction
+    # rating requires a completed, paid transaction by this bidder
     transaction = query_db(
         'SELECT 1 FROM Transactions '
         'WHERE Seller_Email = ? AND Listing_ID = ? AND Bidder_Email = ?',
@@ -211,7 +211,7 @@ def rate_seller(seller_email, listing_id):
         flash('You can only rate a seller after winning and paying for one of their auctions.', 'warning')
         return redirect(url_for('bidder.auction_history'))
 
-    # one rating per auction; schema enforces it too but this gives a nicer msg
+    # check for an existing rating first so we can show a clean message
     existing_rating = query_db(
         'SELECT Rating, Rating_Desc, Date FROM Rating '
         'WHERE Bidder_Email = ? AND Seller_Email = ? AND Listing_ID = ?',
@@ -259,7 +259,7 @@ def rate_seller(seller_email, listing_id):
 def apply_seller():
     email = session['email']
 
-    # only bidders can apply; anyone else here is a session mixup
+    # only bidders can apply to become sellers
     if not query_db('SELECT 1 FROM Bidders WHERE email = ?', [email], one=True):
         flash('Only bidders may apply to become sellers.')
         return redirect(url_for('listings.browse'))
@@ -296,7 +296,7 @@ def apply_seller():
                 form={'bank_routing_num': routing, 'bank_account_num': account, 'note': note},
             )
 
-        # json payload so special chars don't break parsing
+        # json payload for the request description
         desc = format_request_desc(ROUTING=routing, ACCOUNT=account, NOTE=note)
 
         db = get_db()

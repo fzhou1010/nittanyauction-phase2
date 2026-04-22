@@ -28,8 +28,7 @@ def dashboard():
     is_vendor = query_db('SELECT 1 FROM Local_Vendors WHERE email = ?', [email], one=True) is not None
     is_bidder = query_db('SELECT 1 FROM Bidders WHERE email = ?', [email], one=True) is not None
     
-    # Active listings + per-listing bid stats in a single query via the Listing_Bid_Stats view.
-    # LEFT JOIN so listings with zero bids still appear.
+    # active listings with bid counts via the Listing_Bid_Stats view
     active_listings = query_db('''SELECT l.Listing_ID, l.Auction_Title, l.Product_Name, l.Category, l.Reserve_Price, l.Max_bids, l.is_promoted,
                COALESCE(s.Bid_Count, 0) AS bid_count,
                s.Current_Bid AS highest_bid
@@ -86,7 +85,7 @@ def dashboard():
     seller_rating = query_db('''SELECT Avg_Rating AS avg_rating, Rating_Count AS count
                              FROM Seller_Avg_Rating
                              WHERE Seller_Email = ?''', [email], one=True)
-    # view returns no row when the seller has zero ratings; preserve the {avg_rating, count} shape
+    # default shape when the seller has no ratings yet
     if not seller_rating:
         seller_rating = {'avg_rating': None, 'count': 0}
     
@@ -97,7 +96,7 @@ def dashboard():
 # Initial Step of Creating a Listing, Selecting a Category
 @seller_bp.route('/list_product', methods=['GET', 'POST'])
 def list_product():
-    # only leaf categories can hold products, filter out parents
+    # only show leaf categories since products can't sit on a non-leaf
     categories = query_db('''
         SELECT category_name FROM Categories
         WHERE category_name NOT IN (SELECT DISTINCT parent_category FROM Categories WHERE parent_category IS NOT NULL)
@@ -220,7 +219,7 @@ def edit_listing(lid): #should pass in the listing id
         flash('There has been an error, listing not found')
         return redirect(url_for('seller.dashboard'))
 
-    # only leaf categories; keep the listing's current one even if not a leaf
+    # only show leaf categories, plus the listing's current category
     categories = query_db('''
         SELECT category_name FROM Categories
         WHERE category_name NOT IN (SELECT DISTINCT parent_category FROM Categories WHERE parent_category IS NOT NULL)
@@ -454,8 +453,7 @@ def request_category():
 @seller_bp.route('/promote/<int:listing_id>', methods=['POST'])
 def promote_listing(listing_id):
     email = session['email']
-    # payment_method: 'balance' (all sellers) or 'card' (student sellers / dual-role only).
-    # Local vendors are forced to 'balance' regardless of what the form sends.
+    # balance for all sellers, card only for student sellers who are also bidders
     payment_method = (request.form.get('payment_method') or '').strip().lower()
 
     listing = query_db('''SELECT * FROM Auction_Listings

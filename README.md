@@ -88,10 +88,9 @@ listings, and `ON DELETE` is restrictive so history can't be wiped by accident.
   that shows a seller's rating (seller dashboard, listing detail, browse card,
   shopping cart) reads from this view instead of re-aggregating, so the average
   stays consistent across the site and no caller can forget to compute it.
-- **`Listing_Bid_Stats`**: `COUNT(*), MAX(Bid_Price)` grouped by listing. The
-  seller dashboard and cart both need "how many bids so far / what's the top bid"
-  for every listing on the page; the view lets them do that with a single
-  `LEFT JOIN` instead of the N+1 correlated-subquery pattern we started with.
+- **`Listing_Bid_Stats`**: `COUNT(*), MAX(Bid_Price)` grouped by listing. Used
+  by the seller dashboard and cart to show the bid count and current top bid
+  for each listing via a single `LEFT JOIN`.
 
 ### Indexes
 

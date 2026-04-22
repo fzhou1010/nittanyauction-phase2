@@ -362,7 +362,7 @@ def register_form(role):
                 return _reject(role, {'expire_month': 'Card is expired.',
                                       'expire_year': 'Card is expired.'})
             if query_db('SELECT 1 FROM Credit_Cards WHERE credit_card_num = ?', [credit_card_num], one=True):
-                flash('Cards cannot be shared across accounts — this card is already registered to another user.')
+                flash('Cards cannot be shared across accounts. This card is already registered to another user.')
                 return _reject(role, {'credit_card_num': 'Card already registered to another account.'})
             try:
                 # the order of insert into matters, as we want don;t want an integrity error
@@ -421,7 +421,7 @@ def register_form(role):
                 return _reject(role, {'expire_month': 'Card is expired.',
                                       'expire_year': 'Card is expired.'})
             if query_db('SELECT 1 FROM Credit_Cards WHERE credit_card_num = ?', [credit_card_num], one=True):
-                flash('Cards cannot be shared across accounts — this card is already registered to another user.')
+                flash('Cards cannot be shared across accounts. This card is already registered to another user.')
                 return _reject(role, {'credit_card_num': 'Card already registered to another account.'})
             try:
                 # the order of insert into matters, as we want don;t want an integrity error
@@ -635,7 +635,7 @@ def profile():
                     db.commit()
                     flash('Card added successfully!', 'success')
                 except sql.IntegrityError:
-                    flash('Cards cannot be shared across accounts — this card is already registered to another user.', 'danger')
+                    flash('Cards cannot be shared across accounts. This card is already registered to another user.', 'danger')
 
         elif form_type == 'remove_card':
             card_num = request.form.get('credit_card_num', '').strip()

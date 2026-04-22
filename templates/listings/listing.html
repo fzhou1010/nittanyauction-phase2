@@ -1,6 +1,4 @@
 {% macro render_stars(rating, count=None, size='sm') %}
-    {# rating: float 0–5 (typically from Seller_Avg_Rating view). count: optional integer to show in parens.
-       size: 'sm' (small, inline) or 'md' (default Bootstrap icon size). #}
     {% if rating is not none %}
         <span class="text-nowrap">
             {% for i in range(5) %}

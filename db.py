@@ -10,8 +10,7 @@ DATABASE = os.path.join(os.path.dirname(__file__), 'nittanyauction.db')
 HELPDESK_TEAM_EMAIL = 'helpdeskteam@lsu.edu'
 
 def get_db():
-    """Return a database connection for the current request.
-    Reuses the same connection within a single request (stored on Flask's g object)."""
+    """Return the request's DB connection (cached on Flask's g)."""
     from flask import g
     if 'db' not in g:
         g.db = sql.connect(DATABASE)
@@ -54,16 +53,7 @@ def format_request_desc(**fields):
 
 
 def parse_request_desc(desc):
-    """Parse a Requests.request_desc payload into a dict.
-
-    Handles two formats:
-      1. JSON (new, written via format_request_desc)
-      2. Legacy 'KEY: value | KEY: value' pipe-separated (used by CSV-seeded
-         rows and older app code). Keys are upper-cased for consistency with
-         the old _parse_request_desc behavior.
-
-    Missing/empty input returns an empty dict.
-    """
+    """Parse request_desc to a dict. Accepts JSON or the legacy pipe-separated format."""
     desc = (desc or '').strip()
     if not desc:
         return {}
