@@ -78,7 +78,6 @@ def dashboard():
                              FROM Rating
                              WHERE Seller_Email = ?''', [email], one=True)
     
-        
     return render_template('seller/dashboard.html', bal=bal, active_listings=active_listing_details, sold_listings=sold_listings_details,
                            q_count=q_count, seller_rating=seller_rating)
 
@@ -199,26 +198,18 @@ def edit_listing(lid): #should pass in the listing id
     cur_listing = query_db('''SELECT Listing_ID, Auction_Title, Product_Name, Product_Description, Category, Reserve_Price, Max_bids, Condition, Quantity, Status
         FROM Auction_Listings
         WHERE Seller_Email = ? AND Listing_ID = ?''', [email, lid], one=True) #should be one row
-
+    
+    #if the current listing is not found
     if not cur_listing:
-        flash('Listing not found.')
+        flash('There has been an error, listing not found')
         return redirect(url_for('seller.dashboard'))
 
     # sold or inactive listings cannot be edited
     if cur_listing['Status'] != 1:
-        flash('Only active listings can be edited.')
+        flash('Only active listings can be edited')
         return redirect(url_for('seller.dashboard'))
 
-    # check if any bids have been placed. if so, editing the listing should be locked
-    bid_count = query_db('''SELECT COUNT(*) AS cnt FROM Bids
-                            WHERE Seller_Email = ? AND Listing_ID = ?''', [email, lid], one=True)
-    has_bids = bid_count['cnt'] > 0
-
     if request.method == 'POST':
-        # if bids exist, block the update
-        if has_bids:
-            flash('This listing cannot be edited because bidding has already started.')
-            return redirect(url_for('seller.edit_listing', lid=lid))
 
         # get the updated values from the form
         auction_title = request.form.get('auction_title', '').strip()
@@ -230,19 +221,19 @@ def edit_listing(lid): #should pass in the listing id
         max_bids = request.form.get('max_bids')
 
         # validate required fields
-        if not auction_title or not product_name or not product_description:
-            flash('Please fill out all required fields.')
-            return render_template('seller/edit_listing.html', listing=cur_listing, has_bids=has_bids)
+        if not auction_title or not product_name or not product_description or not condition or not quantity or not reserve_price or not max_bids:
+            flash('Please fill out all of the fields')
+            return render_template('seller/edit_listing.html', listing=cur_listing)
 
         # validate numeric fields
         try:
             reserve = float(reserve_price)
             max_b = int(max_bids)
-            if reserve <= 0 or max_b <= 0:
+            if reserve <= 0 or max_b <= 0: #ensure that the reserve price is more than 0 and that the truncated maximum bids is greater than as well
                 raise ValueError
         except (ValueError, TypeError):
-            flash('Reserve price and max bids must be positive numbers.')
-            return render_template('seller/edit_listing.html', listing=cur_listing, has_bids=has_bids)
+            flash('Reserve price and max bids must be positive numbers')
+            return render_template('seller/edit_listing.html', listing=cur_listing)
 
         # update the listing in the database with the values in form field
         db = get_db()
@@ -256,7 +247,7 @@ def edit_listing(lid): #should pass in the listing id
         flash('Listing updated successfully!')
         return redirect(url_for('seller.dashboard'))
 
-    return render_template('seller/edit_listing.html', listing=cur_listing, has_bids=has_bids)
+    return render_template('seller/edit_listing.html', listing=cur_listing)
 
 # Seller Questions
 @seller_bp.route('/questions')
