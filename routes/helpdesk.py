@@ -145,6 +145,10 @@ def handle_request(rid):
     db.execute(
         'UPDATE Requests SET request_status = 1 WHERE request_id = ?', [rid]
     )
+    notify(
+        req['sender_email'], 'request_approved',
+        f'Your request #{rid} ({req["request_type"]}) was approved by HelpDesk staff.',
+    )
     db.commit()
     flash(f'Request #{rid} completed.')
     return redirect(url_for('helpdesk.queue'))

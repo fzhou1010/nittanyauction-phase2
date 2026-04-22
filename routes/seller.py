@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from db import get_db, query_db
+from notifications import notify
 
 seller_bp = Blueprint('seller', __name__)
 
@@ -343,6 +344,11 @@ def question(qid):
         db.execute('''UPDATE Questions SET answer_text = ?, answered = 1
                     WHERE question_id = ? AND Seller_Email = ?
                     ''', [answer_text, qid, email])
+        notify(
+            question['Bidder_Email'], 'question_answered',
+            f'Your question on "{question["Auction_Title"]}" has been answered.',
+            seller_email=email, listing_id=question['Listing_ID'],
+        )
         db.commit()
         flash('Answer has been recorded')
         #return to the same question page for the seller to view the entire log
