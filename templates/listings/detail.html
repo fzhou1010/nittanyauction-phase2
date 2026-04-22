@@ -5,7 +5,7 @@
 <!-- Breadcrumbs -->
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{{ url_for('listings.browse') }}">Home</a></li>
+        <li class="breadcrumb-item"><a href="{{ url_for('listings.browse') }}">All</a></li>
         {% for cat in category_path %}
         <li class="breadcrumb-item">
             <a href="{{ url_for('listings.browse', category=cat) }}">{{ cat }}</a>
