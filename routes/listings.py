@@ -112,10 +112,16 @@ def browse():
                  WHERE b.Seller_Email = Auction_Listings.Seller_Email
                    AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
             FROM Auction_Listings
+            JOIN Bidders bd ON Auction_Listings.Seller_Email = bd.email
             WHERE Status = 1
-              AND (Auction_Title LIKE ? OR Product_Name LIKE ?)
+              AND (Auction_Listings.Auction_Title LIKE ? 
+                    OR Auction_Listings.Product_Name LIKE ? 
+                    OR Auction_Listings.Product_Description LIKE ? 
+                    OR Auction_Listings.Category LIKE ? 
+                    OR bd.first_name LIKE ? 
+                    OR bd.last_name LIKE ?)
             ''',
-            [f'%{search}%', f'%{search}%'],
+            [f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%'],
         )
         return render_template(
             'listings/browse.html',
@@ -222,11 +228,21 @@ def detail(seller_email, listing_id):
         [session['email'], seller_email, listing_id], one=True,
     ) is not None
 
+    reviews = query_db(
+        "SELECT * FROM Rating WHERE Seller_Email = ?",
+        [seller_email]
+    )
+
+    avg_rating = query_db(
+        "SELECT AVG(Rating) as Avg_Rating From Rating WHERE Seller_Email = ?",
+        [seller_email]
+    )
+
     return render_template(
         'listings/detail.html',
-        listing=listing, bids=bids, category_path=category_path,
+        listing=listing, bids=bids, avg_rating = avg_rating, category_path=category_path,
         questions=questions, winner_email=winner_email, has_paid=has_paid,
-        remaining_bids=remaining_bids, in_cart=in_cart,
+        remaining_bids=remaining_bids, in_cart=in_cart, reviews = reviews
     )
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>/bid', methods=['POST'])

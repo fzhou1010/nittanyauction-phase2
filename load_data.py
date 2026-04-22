@@ -25,7 +25,7 @@ LOAD_ORDER = [
     ('Helpdesk.csv', 'Helpdesk', ['email', 'position']),
     ('Zipcode_Info.csv', 'Zipcode_Info', ['zipcode', 'city', 'state']),
     ('Address.csv', 'Address', ['address_id', 'zipcode', 'street_num', 'street_name']),
-    ('Bidders.csv', 'Bidders', ['email', 'first_name', 'last_name', 'age', 'home_address_id', 'major']),
+    ('Bidders.csv', 'Bidders', ['email', 'first_name', 'last_name', 'age', 'home_address_id', 'major', 'phone']),
     ('Credit_Cards.csv', 'Credit_Cards', ['credit_card_num', 'card_type', 'expire_month', 'expire_year', 'security_code', 'Owner_email']),
     ('Sellers.csv', 'Sellers', ['email', 'bank_routing_number', 'bank_account_number', 'balance']),
     ('Local_Vendors.csv', 'Local_Vendors', ['email', 'business_name', 'business_address_id', 'customer_service_phone_number']),
