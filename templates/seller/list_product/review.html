@@ -44,10 +44,11 @@
                             {% if listing['condition'] == 'new' %}
                                 <td>New</td>
                             {%elif listing['condition'] == 'slightly-used' %}
-                                <td>Slighty Used</td>
+                                <td>Slightly Used</td>
                             {% else %}
                                 <td>Used</td>
                             {%endif%}
+                        </tr>
                         <tr>
                             <th>Reserve Price</th>
                             <td>${{ "%.2f"|format(listing['reserve_price']|float) }}</td>

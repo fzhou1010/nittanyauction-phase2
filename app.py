@@ -35,7 +35,7 @@ from routes.notifications import notifications_bp
 
 app.register_blueprint(auth_bp)                              # /login, /logout, /register, /profile
 app.register_blueprint(listings_bp)                          # /browse (auction listings)
-app.register_blueprint(bidder_bp, url_prefix='/bidder')      # /bidder/welcome, /bidder/credit_cards, etc.
+app.register_blueprint(bidder_bp, url_prefix='/bidder')      # /bidder/welcome, /bidder/watchlist, etc.
 app.register_blueprint(seller_bp, url_prefix='/seller')      # /seller/welcome, /seller/dashboard, etc.
 app.register_blueprint(helpdesk_bp, url_prefix='/helpdesk')  # /helpdesk/welcome, /helpdesk/queue, etc.
 app.register_blueprint(notifications_bp, url_prefix='/notifications')  # shared notifications UI for all roles

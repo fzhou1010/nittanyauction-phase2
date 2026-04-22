@@ -113,27 +113,52 @@ def browse():
 
     # Flat search bypasses the hierarchy entirely
     if search:
-        listings = query_db(
-            '''
-            SELECT *,
+        like = f'%{search}%'
+        search_where = '''
+            WHERE Status = 1
+              AND (Auction_Listings.Auction_Title LIKE ?
+                    OR Auction_Listings.Product_Name LIKE ?
+                    OR Auction_Listings.Product_Description LIKE ?
+                    OR Auction_Listings.Category LIKE ?
+                    OR bd.first_name LIKE ?
+                    OR bd.last_name LIKE ?)
+        '''
+        search_params = [like, like, like, like, like, like]
+
+        promoted_listings = query_db(
+            f'''
+            SELECT Auction_Listings.*,
                 (SELECT MAX(Bid_Price) FROM Bids b
                  WHERE b.Seller_Email = Auction_Listings.Seller_Email
                    AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
             FROM Auction_Listings
             JOIN Bidders bd ON Auction_Listings.Seller_Email = bd.email
-            WHERE Status = 1
-              AND (Auction_Listings.Auction_Title LIKE ? 
-                    OR Auction_Listings.Product_Name LIKE ? 
-                    OR Auction_Listings.Product_Description LIKE ? 
-                    OR Auction_Listings.Category LIKE ? 
-                    OR bd.first_name LIKE ? 
-                    OR bd.last_name LIKE ?)
+            {search_where}
+              AND Auction_Listings.is_promoted = 1
+            ORDER BY Auction_Listings.promotion_time DESC
             ''',
-            [f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%'],
+            search_params,
         )
+        promoted_keys = {(r['Seller_Email'], r['Listing_ID']) for r in promoted_listings}
+
+        all_matches = query_db(
+            f'''
+            SELECT Auction_Listings.*,
+                (SELECT MAX(Bid_Price) FROM Bids b
+                 WHERE b.Seller_Email = Auction_Listings.Seller_Email
+                   AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
+            FROM Auction_Listings
+            JOIN Bidders bd ON Auction_Listings.Seller_Email = bd.email
+            {search_where}
+            ''',
+            search_params,
+        )
+        listings = [r for r in all_matches if (r['Seller_Email'], r['Listing_ID']) not in promoted_keys]
+
         return render_template(
             'listings/browse.html',
             mode='search', search=search, listings=listings,
+            promoted_listings=promoted_listings,
         )
 
     # Hierarchy mode: dynamically fetch subcategories of the current node
@@ -152,7 +177,7 @@ def browse():
                  WHERE b.Seller_Email = Auction_Listings.Seller_Email
                    AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
             FROM Auction_Listings
-            WHERE Status = 1 AND Category = ?
+            WHERE Status = 1 AND Category = ? AND (is_promoted IS NULL OR is_promoted = 0)
             ''',
             [category],
         )
@@ -233,7 +258,7 @@ def detail(seller_email, listing_id):
             [current_cat],
             one=True
         )
-        current_cat = parent['parent_category'] if parent else None
+        current_cat = parent['parent_category'] if parent and parent['parent_category'] != ROOT_PARENT else None
 
     questions = query_db('''
         SELECT question_text, answer_text, Bidder_Email, Question_time
@@ -247,6 +272,13 @@ def detail(seller_email, listing_id):
     has_paid = False
     bid_count = len(bids)
     remaining_bids = listing['Max_bids'] - bid_count if listing['Max_bids'] else 0
+
+    # Reserve price is a seller's sale threshold, not a bid floor — bidders
+    # can open at any positive amount and just need to outbid the current highest.
+    if bids:
+        min_bid = int(bids[0]['Bid_Price']) + 1
+    else:
+        min_bid = 1
 
     if listing['Status'] == 2 and bids:
         winner_email = bids[0]['Bidder_Email']  # bids ordered DESC by price
@@ -268,14 +300,15 @@ def detail(seller_email, listing_id):
 
     avg_rating = query_db(
         "SELECT AVG(Rating) as Avg_Rating From Rating WHERE Seller_Email = ?",
-        [seller_email]
+        [seller_email], one=True
     )
 
     return render_template(
         'listings/detail.html',
         listing=listing, bids=bids, avg_rating = avg_rating, category_path=category_path,
         questions=questions, winner_email=winner_email, has_paid=has_paid,
-        remaining_bids=remaining_bids, in_cart=in_cart, reviews = reviews
+        remaining_bids=remaining_bids, in_cart=in_cart, reviews = reviews,
+        min_bid=min_bid,
     )
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>/bid', methods=['POST'])
@@ -331,9 +364,11 @@ def place_bid(seller_email, listing_id):
         flash('You cannot place consecutive bids — wait for another bidder first.', 'danger')
         return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
 
-    # if there are no bids yet, the minimum required bid is the reserve price (or 0 if no reserve). Otherwise, it must be at least $1 higher than the current highest bid.
+    # Reserve price is the seller's sale threshold (checked at auction close), not
+    # a bid floor. Any positive bid is allowed for the first bid; subsequent bids
+    # must exceed the current highest by at least $1.
     if current_bids['highest_bid'] is None:
-        min_required = auction['Reserve_Price'] or 0.0
+        min_required = 1.00
     else:
         min_required = current_bids['highest_bid'] + 1.00
 
@@ -358,8 +393,7 @@ def place_bid(seller_email, listing_id):
             flash('Your bid was placed, but another bidder won the auction.', 'info')
     elif outcome and outcome['status'] == 'failed':
         flash('Auction ended — reserve price was not met.', 'warning')
-    else:
-        flash('Your bid has been placed.', 'success')
+    # For the open-auction case we let the updated bid card communicate the result.
     return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
 
 @listings_bp.route('/listing/<seller_email>/<int:listing_id>/question', methods=['POST'])
