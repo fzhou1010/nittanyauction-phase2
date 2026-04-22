@@ -103,25 +103,46 @@ def browse():
     search = (request.args.get('q') or '').strip()
     category = (request.args.get('category') or '').strip()
 
+    p_min_raw = request.args.get('min_price', '').strip()
+    p_max_raw = request.args.get('max_price', '').strip()
+
+    price_min = float(p_min_raw) if p_min_raw else None
+    price_max = float(p_max_raw) if p_max_raw else None
+
+
+
+
     # Flat search bypasses the hierarchy entirely
     if search:
         listings = query_db(
             '''
-            SELECT *,
-                (SELECT MAX(Bid_Price) FROM Bids b
-                 WHERE b.Seller_Email = Auction_Listings.Seller_Email
-                   AND b.Listing_ID = Auction_Listings.Listing_ID) AS Current_Bid
-            FROM Auction_Listings
-            JOIN Bidders bd ON Auction_Listings.Seller_Email = bd.email
-            WHERE Status = 1
-              AND (Auction_Listings.Auction_Title LIKE ? 
-                    OR Auction_Listings.Product_Name LIKE ? 
-                    OR Auction_Listings.Product_Description LIKE ? 
-                    OR Auction_Listings.Category LIKE ? 
-                    OR bd.first_name LIKE ? 
-                    OR bd.last_name LIKE ?)
+            WITH AListings AS (
+                SELECT 
+                    al.*,
+                    bd.first_name,
+                    bd.last_name,
+                    (SELECT MAX(b.Bid_Price) 
+                    FROM Bids b
+                    WHERE b.Seller_Email = al.Seller_Email
+                    AND b.Listing_ID = al.Listing_ID) AS Current_Bid
+                FROM Auction_Listings al
+                JOIN Bidders bd ON al.Seller_Email = bd.email
+                WHERE al.Status = 1
+            )
+            SELECT * FROM AListings
+            WHERE (Auction_Title LIKE ? 
+                OR Product_Name LIKE ? 
+                OR Product_Description LIKE ? 
+                OR Category LIKE ? 
+                OR first_name LIKE ? 
+                OR last_name LIKE ?)
+                AND (
+                    (? IS NULL AND ? IS NULL)
+                    OR
+                    (Current_Bid <= COALESCE(?, 99999999) AND Current_Bid >= COALESCE(?, 0)))
+
             ''',
-            [f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%'],
+            [f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%', price_max, price_min, price_max, price_min],
         )
         return render_template(
             'listings/browse.html',
