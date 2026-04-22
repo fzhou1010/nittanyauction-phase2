@@ -1,7 +1,7 @@
 # Main entry point for the Flask web application.
 # Run this file (python app.py) to start the NittanyAuction server on http://127.0.0.1:5000
 
-from flask import Flask, session, redirect, url_for
+from flask import Flask, session, redirect, url_for, request, flash
 from db import close_db, query_db
 
 app = Flask(__name__)
@@ -24,6 +24,20 @@ def displaydate(value):
         except ValueError:
             continue
     return s  # unknown format: render as-is
+
+
+@app.before_request
+def invalidate_stale_session():
+    # if helpdesk renamed the session's email, drop the session and send them to login
+    if request.endpoint in (None, 'static', 'auth.login', 'auth.logout'):
+        return
+    email = session.get('email')
+    if not email:
+        return
+    if not query_db('SELECT 1 FROM Users WHERE email = ?', [email], one=True):
+        session.clear()
+        flash('Your email was changed by HelpDesk. Please sign in with your new email.', 'warning')
+        return redirect(url_for('auth.login'))
 
 
 @app.context_processor
