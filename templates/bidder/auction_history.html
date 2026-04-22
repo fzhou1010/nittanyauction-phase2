@@ -108,6 +108,8 @@
                             <span class="badge bg-success">{{ b.status_label }}</span>
                         {% elif b.status == 2 %}
                             <span class="badge bg-secondary">{{ b.status_label }}</span>
+                        {% elif b.status == 3 %}
+                            <span class="badge bg-warning text-dark">{{ b.status_label }}</span>
                         {% else %}
                             <span class="badge bg-light text-dark">{{ b.status_label }}</span>
                         {% endif %}

@@ -72,13 +72,17 @@
                         <p class="text-center mb-0">This auction has been sold to another bidder.</p>
                     {% endif %}
 
-                {% elif listing.Status == 0 %}
-                    {# ── Auction failed / removed ── #}
+                {% elif listing.Status == 3 %}
+                    {# ── Auction failed due to reserve price ── #}
                     <div class="alert alert-secondary mb-3">
                         <h5 class="alert-heading text-center">Auction Ended</h5>
                         <p>This auction has ended &mdash; the reserve price was not met.</p>
                     </div>
-
+                {% elif listing.Status == 0 %}
+                    <div class="alert alert-secondary mb-3">
+                        <h5 class="alert-heading text-center">Auction Ended</h5>
+                        <p>This auction has ended &mdash; The listing has been removed by the seller</p>
+                    </div>
                 {% else %}
                     {# ── Active auction ── #}
                     {% set is_top_bidder = bids and bids[0].Bidder_Email == session.get('email') %}
@@ -170,9 +174,16 @@
 
                 <form class="mt-auto" action="{{ url_for('listings.ask_question', seller_email=listing.Seller_Email, listing_id=listing.Listing_ID) }}" method="post">
                     <div class="input-group">
+                        <!-- Sellers shouldn't be able to ask questions regarding their own listings -->
+                        {% if session.get('email') != listing.Seller_Email %}
                         <textarea name="question" class="form-control" rows="1" style="resize: none;"
                                   placeholder="Ask a question about this listing" required></textarea>
                         <button type="submit" class="btn btn-primary">Submit</button>
+                        {%else%}
+                        <textarea name="question" class="form-control" rows="1" style="resize: none;"
+                                  placeholder="Ask a question about this listing" required disabled></textarea>
+                        <button type="submit" class="btn btn-primary" disabled>Submit</button>
+                        {%endif%}
                     </div>
                 </form>
             </div>

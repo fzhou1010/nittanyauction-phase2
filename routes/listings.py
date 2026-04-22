@@ -97,8 +97,9 @@ def check_auction_complete(seller_email, listing_id):
         db.commit()
         return {'status': 'sold', 'winner': highest['Bidder_Email'], 'amount': highest['Bid_Price']}
 
+    #if the auction fails due to reserve price not being met
     db.execute(
-        'UPDATE Auction_Listings SET Status = 0 WHERE Seller_Email = ? AND Listing_ID = ?',
+        'UPDATE Auction_Listings SET Status = 3 WHERE Seller_Email = ? AND Listing_ID = ?',
         [seller_email, listing_id],
     )
     _notify_auction_close(seller_email, listing_id, title, 'failed')
