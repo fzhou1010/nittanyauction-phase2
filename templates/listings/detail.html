@@ -82,15 +82,16 @@
                 {% endif %}
 
                 {% if session.get('email') != listing.Seller_Email %}
-                    <hr>
                     {% if in_cart %}
+                    <hr>
                     <form action="{{ url_for('bidder.cart_remove') }}" method="post">
                         <input type="hidden" name="seller_email" value="{{ listing.Seller_Email }}">
                         <input type="hidden" name="listing_id" value="{{ listing.Listing_ID }}">
                         <input type="hidden" name="next" value="{{ url_for('listings.detail', seller_email=listing.Seller_Email, listing_id=listing.Listing_ID) }}">
                         <button type="submit" class="btn btn-outline-secondary w-100 btn-sm">Remove from Shopping Cart</button>
                     </form>
-                    {% else %}
+                    {% elif listing.Status == 1 %}
+                    <hr>
                     <form action="{{ url_for('bidder.cart_add') }}" method="post">
                         <input type="hidden" name="seller_email" value="{{ listing.Seller_Email }}">
                         <input type="hidden" name="listing_id" value="{{ listing.Listing_ID }}">

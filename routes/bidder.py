@@ -76,12 +76,15 @@ def cart_add():
         return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
 
     listing = query_db(
-        'SELECT 1 FROM Auction_Listings WHERE Seller_Email = ? AND Listing_ID = ?',
+        'SELECT Status FROM Auction_Listings WHERE Seller_Email = ? AND Listing_ID = ?',
         [seller_email, listing_id], one=True,
     )
     if not listing:
         flash('Listing not found.')
         return redirect(url_for('listings.browse'))
+    if listing['Status'] != 1:
+        flash('This auction has ended and can no longer be added to your cart.')
+        return redirect(url_for('listings.detail', seller_email=seller_email, listing_id=listing_id))
 
     db = get_db()
     db.execute(
